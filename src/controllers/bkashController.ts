@@ -143,7 +143,7 @@ export async function callbackPayment(req: AuthenticatedRequest, res: Response):
   console.log(`Received bKash callback response. Status: ${status}, PaymentID: ${paymentID}`);
 
   if (status !== 'success') {
-    res.redirect(`http://localhost:3000/?payment_status=failed&message=Payment+cancelled+or+failed`);
+    res.redirect(`http://localhost:3000/dashboard?payment_status=failed&message=Payment+cancelled+or+failed`);
     return;
   }
 
@@ -174,10 +174,10 @@ export async function callbackPayment(req: AuthenticatedRequest, res: Response):
       }
 
       console.log(`Simulated payment complete. Saved Invoice ${inv} with Trx: ${mockTrxId}`);
-      res.redirect(`http://localhost:3000/?payment_status=success&invoice_no=${inv}&trx_id=${mockTrxId}`);
+      res.redirect(`http://localhost:3000/dashboard?payment_status=success&invoice_no=${inv}&trx_id=${mockTrxId}`);
     } catch (err) {
       console.error('Database error saving simulated invoice:', err);
-      res.redirect(`http://localhost:3000/?payment_status=error`);
+      res.redirect(`http://localhost:3000/dashboard?payment_status=error`);
     }
     return;
   }
@@ -211,13 +211,13 @@ export async function callbackPayment(req: AuthenticatedRequest, res: Response):
       );
       
       console.log(`Payment confirmed via bKash. TrxID: ${trxID}`);
-      res.redirect(`http://localhost:3000/?payment_status=success&invoice_no=${merchantInvoiceNumber}&trx_id=${trxID}`);
+      res.redirect(`http://localhost:3000/dashboard?payment_status=success&invoice_no=${merchantInvoiceNumber}&trx_id=${trxID}`);
     } else {
       console.warn(`Payment execute failed: ${errorMessage}`);
-      res.redirect(`http://localhost:3000/?payment_status=failed&message=${encodeURIComponent(errorMessage || 'Execution failed')}`);
+      res.redirect(`http://localhost:3000/dashboard?payment_status=failed&message=${encodeURIComponent(errorMessage || 'Execution failed')}`);
     }
   } catch (error: any) {
     console.error('Error executing bKash payment callback:', error.message || error);
-    res.redirect(`http://localhost:3000/?payment_status=error`);
+    res.redirect(`http://localhost:3000/dashboard?payment_status=error`);
   }
 }

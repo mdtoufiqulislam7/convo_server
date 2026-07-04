@@ -12,6 +12,12 @@ import {
   getProducts, 
   createProduct 
 } from '../controllers/adminController';
+import {
+  getUserProducts,
+  createUserProduct,
+  getUserCredentials,
+  upsertUserCredentials
+} from '../controllers/userDashboardController';
 
 const router = Router();
 
@@ -31,7 +37,13 @@ router.post('/leads', createLead);
 router.post('/bkash/create', authenticateToken, createPayment);
 router.get('/bkash/callback', callbackPayment);
 
-// --- 5. Protected Admin Operations Endpoints ---
+// --- 5. Protected Client Dashboard Endpoints ---
+router.get('/user/products', authenticateToken, getUserProducts);
+router.post('/user/products', authenticateToken, createUserProduct);
+router.get('/user/credentials', authenticateToken, getUserCredentials);
+router.post('/user/credentials', authenticateToken, upsertUserCredentials);
+
+// --- 6. Protected Admin Operations Endpoints ---
 router.get('/admin/messages', authenticateToken, requireAdmin, getMessages);
 router.get('/admin/users', authenticateToken, requireAdmin, getUsers);
 router.post('/admin/users/:id/role', authenticateToken, requireAdmin, updateUserRole);

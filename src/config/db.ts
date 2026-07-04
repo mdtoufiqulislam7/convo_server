@@ -77,7 +77,32 @@ export async function initializeDatabase() {
     `);
     console.log('Table "payments" checked/created.');
 
-    // 5. Seed default admin if it does not exist
+    // 5. Create user_products table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS user_products (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('Table "user_products" checked/created.');
+
+    // 6. Create page_credentials table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS page_credentials (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+        page_name VARCHAR(255),
+        page_id VARCHAR(255),
+        page_access_token TEXT,
+        verify_token VARCHAR(255),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('Table "page_credentials" checked/created.');
+
+    // 7. Seed default admin if it does not exist
     const adminEmail = 'admin@convoes.app';
     const adminCheck = await client.query('SELECT * FROM users WHERE email = $1', [adminEmail]);
     if (adminCheck.rows.length === 0) {
