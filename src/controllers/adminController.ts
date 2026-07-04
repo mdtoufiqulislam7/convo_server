@@ -45,18 +45,30 @@ export async function updateUserRole(req: AuthenticatedRequest, res: Response): 
 
 // 4. Get Payments/Invoices list (GET /api/admin/payments)
 export async function getPayments(req: AuthenticatedRequest, res: Response): Promise<void> {
+  const userId = req.user?.id;
+  const userRole = req.user?.role;
+
   try {
-    const result = await pool.query(`
+    let query = `
       SELECT p.*, u.name as user_name, u.email as user_email,
              sp.name as plan_name, sp.price as plan_price, sp.features as plan_features
       FROM payments p 
       LEFT JOIN users u ON p.user_id = u.id 
       LEFT JOIN subscription_plans sp ON p.subscription_id = sp.id
-      ORDER BY p.created_at DESC
-    `);
+    `;
+    const params: any[] = [];
+
+    if (userRole !== 'admin') {
+      query += ` WHERE p.user_id = $1`;
+      params.push(userId);
+    }
+
+    query += ` ORDER BY p.created_at DESC`;
+
+    const result = await pool.query(query, params);
     res.status(200).json({ success: true, payments: result.rows });
   } catch (error) {
-    console.error('Admin getPayments error:', error);
+    console.error('getPayments query error:', error);
     res.status(500).json({ success: false, message: 'Server database query error.' });
   }
 }

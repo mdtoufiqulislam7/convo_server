@@ -49,7 +49,7 @@ router.post('/user/credentials', authenticateToken, upsertUserCredentials);
 router.get('/admin/messages', authenticateToken, requireAdmin, getMessages);
 router.get('/admin/users', authenticateToken, requireAdmin, getUsers);
 router.post('/admin/users/:id/role', authenticateToken, requireAdmin, updateUserRole);
-router.get('/admin/payments', authenticateToken, requireAdmin, getPayments);
+router.get('/admin/payments', authenticateToken, getPayments);
 router.get('/admin/leads', authenticateToken, requireAdmin, getLeads);
 router.get('/admin/products', authenticateToken, requireAdmin, getProducts);
 router.post('/admin/products', authenticateToken, requireAdmin, createProduct);
