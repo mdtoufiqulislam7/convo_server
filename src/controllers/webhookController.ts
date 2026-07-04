@@ -30,6 +30,7 @@ export async function verifyWebhook(req: Request, res: Response): Promise<void> 
 // Listener Endpoint (POST /api/webhook)
 export async function receiveWebhookEvent(req: Request, res: Response): Promise<void> {
   const body = req.body;
+  console.log('Received webhook POST event payload:', JSON.stringify(body, null, 2));
 
   // Check if this is an event from a page subscription
   if (body.object === 'page') {
