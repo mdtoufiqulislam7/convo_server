@@ -1,4 +1,4 @@
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { pool } from '../config/db';
 import { AuthenticatedRequest } from './authController';
 
@@ -134,5 +134,16 @@ export async function upsertUserCredentials(req: AuthenticatedRequest, res: Resp
   } catch (error) {
     console.error('Error saving user page credentials:', error);
     res.status(500).json({ success: false, message: 'Server database write error.' });
+  }
+}
+
+// 5. Get subscription plans (GET /api/subscription-plans)
+export async function getSubscriptionPlans(req: Request, res: Response): Promise<void> {
+  try {
+    const result = await pool.query('SELECT * FROM subscription_plans ORDER BY id ASC');
+    res.status(200).json({ success: true, plans: result.rows });
+  } catch (error) {
+    console.error('Error fetching subscription plans:', error);
+    res.status(500).json({ success: false, message: 'Server database query error.' });
   }
 }

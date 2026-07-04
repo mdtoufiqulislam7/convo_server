@@ -39,7 +39,7 @@ async function getBkashToken(): Promise<string> {
 
 // 1. Create Payment (POST /api/bkash/create)
 export async function createPayment(req: AuthenticatedRequest, res: Response): Promise<void> {
-  const { amount, packageName, simulate } = req.body;
+  const { amount, packageName, simulate, subscriptionId } = req.body;
   const userId = req.user?.id;
 
   if (!amount || !packageName) {
@@ -55,12 +55,12 @@ export async function createPayment(req: AuthenticatedRequest, res: Response): P
     
     // Create a pending payment in DB
     await pool.query(
-      `INSERT INTO payments (user_id, invoice_no, amount, payment_status, package_name) 
-       VALUES ($1, $2, $3, $4, $5)`,
-      [userId || null, invoiceNo, amount, 'pending', packageName]
+      `INSERT INTO payments (user_id, invoice_no, amount, payment_status, package_name, subscription_id) 
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [userId || null, invoiceNo, amount, 'pending', packageName, subscriptionId || null]
     );
 
-    const redirectUrl = `https://api.convoes.app/api/bkash/callback?paymentID=MOCK_${invoiceNo}&status=success&invoiceNo=${invoiceNo}`;
+    const redirectUrl = `https://api.convoes.app/api/bkash/callback?paymentID=MOCK_${invoiceNo}&status=success&invoiceNo=${invoiceNo}&simSubscriptionId=${subscriptionId || ''}`;
     
     res.status(200).json({
       success: true,
@@ -106,16 +106,16 @@ export async function createPayment(req: AuthenticatedRequest, res: Response): P
         success: true,
         isSimulation: true,
         message: `bKash API rejected request: ${errorMessage}. Redirecting to Sandbox Simulator.`,
-        bkashURL: `https://api.convoes.app/api/bkash/callback?paymentID=SIM_${invoiceNo}&status=success&invoiceNo=${invoiceNo}&simAmount=${amount}&simPackage=${encodeURIComponent(packageName)}`
+        bkashURL: `https://api.convoes.app/api/bkash/callback?paymentID=SIM_${invoiceNo}&status=success&invoiceNo=${invoiceNo}&simAmount=${amount}&simPackage=${encodeURIComponent(packageName)}&simSubscriptionId=${subscriptionId || ''}`
       });
       return;
     }
 
     // Insert pending payment into database
     await pool.query(
-      `INSERT INTO payments (user_id, invoice_no, amount, payment_status, package_name, bkash_trx_id) 
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [userId || null, invoiceNo, amount, 'pending', packageName, paymentID]
+      `INSERT INTO payments (user_id, invoice_no, amount, payment_status, package_name, bkash_trx_id, subscription_id) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [userId || null, invoiceNo, amount, 'pending', packageName, paymentID, subscriptionId || null]
     );
 
     res.status(200).json({
@@ -131,14 +131,14 @@ export async function createPayment(req: AuthenticatedRequest, res: Response): P
       success: true,
       isSimulation: true,
       message: 'bKash network endpoint unreachable. Redirecting to Sandbox Simulator.',
-      bkashURL: `https://api.convoes.app/api/bkash/callback?paymentID=SIM_${invoiceNo}&status=success&invoiceNo=${invoiceNo}&simAmount=${amount}&simPackage=${encodeURIComponent(packageName)}`
+      bkashURL: `https://api.convoes.app/api/bkash/callback?paymentID=SIM_${invoiceNo}&status=success&invoiceNo=${invoiceNo}&simAmount=${amount}&simPackage=${encodeURIComponent(packageName)}&simSubscriptionId=${subscriptionId || ''}`
     });
   }
 }
 
 // 2. Callback Listener (GET /api/bkash/callback)
 export async function callbackPayment(req: AuthenticatedRequest, res: Response): Promise<void> {
-  const { paymentID, status, invoiceNo, simAmount, simPackage } = req.query;
+  const { paymentID, status, invoiceNo, simAmount, simPackage, simSubscriptionId } = req.query;
 
   console.log(`Received bKash callback response. Status: ${status}, PaymentID: ${paymentID}`);
 
@@ -151,6 +151,7 @@ export async function callbackPayment(req: AuthenticatedRequest, res: Response):
   if (paymentID && (String(paymentID).startsWith('MOCK_') || String(paymentID).startsWith('SIM_'))) {
     const inv = invoiceNo ? String(invoiceNo) : `INV-MOCK-${Date.now()}`;
     const mockTrxId = `BKASH-${Date.now().toString().slice(-8)}`;
+    const subId = simSubscriptionId ? Number(simSubscriptionId) : null;
 
     try {
       // Find if invoice exists, if not create it
@@ -158,18 +159,18 @@ export async function callbackPayment(req: AuthenticatedRequest, res: Response):
       if (checkInv.rows.length > 0) {
         await pool.query(
           `UPDATE payments 
-           SET payment_status = 'completed', bkash_trx_id = $1 
-           WHERE invoice_no = $2`,
-          [mockTrxId, inv]
+           SET payment_status = 'completed', bkash_trx_id = $1, subscription_id = $2 
+           WHERE invoice_no = $3`,
+          [mockTrxId, subId, inv]
         );
       } else {
         // If it was forced fallback and doesn't exist yet, insert completed
         const finalAmt = simAmount ? Number(simAmount) : 79.00;
         const finalPkg = simPackage ? String(simPackage) : 'Advanced Vector Search Bundle';
         await pool.query(
-          `INSERT INTO payments (invoice_no, amount, payment_status, bkash_trx_id, package_name) 
-           VALUES ($1, $2, 'completed', $3, $4)`,
-          [inv, finalAmt, mockTrxId, finalPkg]
+          `INSERT INTO payments (invoice_no, amount, payment_status, bkash_trx_id, package_name, subscription_id) 
+           VALUES ($1, $2, 'completed', $3, $4, $5)`,
+          [inv, finalAmt, mockTrxId, finalPkg, subId]
         );
       }
 

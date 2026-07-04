@@ -62,7 +62,20 @@ export async function initializeDatabase() {
     `);
     console.log('Table "users" checked/created.');
 
-    // 4. Create payments table
+    // 4. Create subscription_plans table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS subscription_plans (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        price NUMERIC(10, 2) NOT NULL,
+        features TEXT[] NOT NULL,
+        description TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('Table "subscription_plans" checked/created.');
+
+    // 5. Create payments table
     await client.query(`
       CREATE TABLE IF NOT EXISTS payments (
         id SERIAL PRIMARY KEY,
@@ -77,7 +90,14 @@ export async function initializeDatabase() {
     `);
     console.log('Table "payments" checked/created.');
 
-    // 5. Create user_products table
+    // 6. Alter payments table to append subscription_id foreign key safely
+    await client.query(`
+      ALTER TABLE payments 
+      ADD COLUMN IF NOT EXISTS subscription_id INTEGER REFERENCES subscription_plans(id) ON DELETE SET NULL;
+    `);
+    console.log('payments table altered to verify subscription_id column.');
+
+    // 7. Create user_products table
     await client.query(`
       CREATE TABLE IF NOT EXISTS user_products (
         id SERIAL PRIMARY KEY,
@@ -88,7 +108,7 @@ export async function initializeDatabase() {
     `);
     console.log('Table "user_products" checked/created.');
 
-    // 6. Create page_credentials table
+    // 8. Create page_credentials table
     await client.query(`
       CREATE TABLE IF NOT EXISTS page_credentials (
         id SERIAL PRIMARY KEY,
@@ -102,7 +122,24 @@ export async function initializeDatabase() {
     `);
     console.log('Table "page_credentials" checked/created.');
 
-    // 7. Seed default admin if it does not exist
+    // Seed default subscription plans if empty
+    const planCheck = await client.query('SELECT COUNT(*) FROM subscription_plans');
+    if (parseInt(planCheck.rows[0].count, 10) === 0) {
+      console.log('Seeding default subscription plans...');
+      await client.query(`
+        INSERT INTO subscription_plans (name, price, features, description) VALUES
+        ($1, $2, $3, $4),
+        ($5, $6, $7, $8),
+        ($9, $10, $11, $12)
+      `, [
+        'Basic Automation Setup', 2900.00, ['Up to 50 Products catalog', 'Keyword smart matching', 'Gemini Auto-replies'], 'Standard response setup for small business FB pages.',
+        'Advanced Vector Search Bundle', 7900.00, ['Up to 500 Products catalog', 'Keyword + Description search', 'Advanced context parsing'], 'Advanced vector search indexing for dynamic product inventories.',
+        'Custom Automation Suite', 19900.00, ['Unlimited Products catalog', 'Dedicated database indexer', '24/7 dedicated developer Support'], 'Custom API integrations and dedicated support resources.'
+      ]);
+      console.log('Subscription plans seeded successfully.');
+    }
+
+    // Seed default admin if it does not exist
     const adminEmail = 'admin@convoes.app';
     const adminCheck = await client.query('SELECT * FROM users WHERE email = $1', [adminEmail]);
     if (adminCheck.rows.length === 0) {

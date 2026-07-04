@@ -47,9 +47,11 @@ export async function updateUserRole(req: AuthenticatedRequest, res: Response): 
 export async function getPayments(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
     const result = await pool.query(`
-      SELECT p.*, u.name as user_name, u.email as user_email 
+      SELECT p.*, u.name as user_name, u.email as user_email,
+             sp.name as plan_name, sp.price as plan_price, sp.features as plan_features
       FROM payments p 
       LEFT JOIN users u ON p.user_id = u.id 
+      LEFT JOIN subscription_plans sp ON p.subscription_id = sp.id
       ORDER BY p.created_at DESC
     `);
     res.status(200).json({ success: true, payments: result.rows });

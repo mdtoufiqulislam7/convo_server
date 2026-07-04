@@ -16,7 +16,8 @@ import {
   getUserProducts,
   createUserProduct,
   getUserCredentials,
-  upsertUserCredentials
+  upsertUserCredentials,
+  getSubscriptionPlans
 } from '../controllers/userDashboardController';
 
 const router = Router();
@@ -29,9 +30,10 @@ router.post('/webhook', receiveWebhookEvent);
 router.post('/auth/register', register);
 router.post('/auth/login', login);
 
-// --- 3. Public Stats & Leads Endpoints ---
+// --- 3. Public Stats, Leads & Plans Endpoints ---
 router.get('/stats', getStats);
 router.post('/leads', createLead);
+router.get('/subscription-plans', getSubscriptionPlans);
 
 // --- 4. bKash Tokenized Payment Endpoints ---
 router.post('/bkash/create', authenticateToken, createPayment);
