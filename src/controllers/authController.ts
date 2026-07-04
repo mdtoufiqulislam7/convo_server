@@ -24,7 +24,7 @@ export function authenticateToken(req: AuthenticatedRequest, res: Response, next
     return;
   }
 
-  jwt.verify(token, JWT_SECRET, (err, decoded) => {
+  jwt.verify(token, JWT_SECRET, (err: any, decoded: any) => {
     if (err) {
       res.status(403).json({ success: false, message: 'Invalid or expired session token.' });
       return;
