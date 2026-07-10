@@ -3,6 +3,7 @@ import path from 'path';
 import crypto from 'crypto';
 import axios from 'axios';
 import { OpenAI } from 'openai';
+import { GoogleGenAI } from '@google/genai';
 
 const AUDIO_DIR = path.join(__dirname, '../../public/audio');
 
@@ -139,11 +140,11 @@ export async function generateVoice(
 }
 
 /**
- * Downloads a voice file from Facebook and transcribes it using OpenAI Whisper.
+ * Downloads a voice file from Facebook and transcribes it using Gemini or OpenAI Whisper.
  */
 export async function transcribeAudio(audioUrl: string, apiKey: string): Promise<string> {
   if (!apiKey) {
-    throw new Error('OpenAI API Key is required for speech-to-text transcription.');
+    throw new Error('API Key is required for speech-to-text transcription.');
   }
 
   const filename = `temp-whisper-${crypto.randomUUID()}.mp4`;
@@ -152,22 +153,39 @@ export async function transcribeAudio(audioUrl: string, apiKey: string): Promise
   console.log(`[VoiceService] Downloading audio attachment from Meta CDN: ${audioUrl}...`);
 
   try {
-    // Download the file via axios stream
+    // Download the file
     const response = await axios({
       method: 'get',
       url: audioUrl,
-      responseType: 'stream',
+      responseType: 'arraybuffer',
     });
 
-    const writer = fs.createWriteStream(tempFilePath);
-    response.data.pipe(writer);
+    const buffer = Buffer.from(response.data);
 
-    await new Promise((resolve, reject) => {
-      writer.on('finish', resolve);
-      writer.on('error', reject);
-    });
+    // If it's a Google key, transcribe with Gemini!
+    if (apiKey.startsWith('AQ.') || apiKey.startsWith('AIzaSy')) {
+      console.log(`[VoiceService] Transcribing using Google Gemini 2.5 Flash...`);
+      const ai = new GoogleGenAI({ apiKey: apiKey });
+      const genResponse = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-lite',
+        contents: [
+          {
+            inlineData: {
+              mimeType: 'audio/mp4',
+              data: buffer.toString('base64'),
+            }
+          },
+          'Transcribe this voice message into Bengali or English plain text. Output ONLY the transcription text. Do not add any greeting, punctuation wrapper, prefix, or extra feedback. If the audio is silent or unintelligible, respond with empty.'
+        ]
+      });
+      const transcribedText = genResponse.text?.trim() || '';
+      console.log(`[VoiceService] Gemini transcription complete: "${transcribedText}"`);
+      return transcribedText;
+    }
 
-    console.log(`[VoiceService] Audio downloaded. Transcribing via OpenAI Whisper...`);
+    // Default: Write to file and transcribe with OpenAI Whisper
+    fs.writeFileSync(tempFilePath, buffer);
+    console.log(`[VoiceService] Transcribing via OpenAI Whisper...`);
 
     const openai = new OpenAI({ apiKey: apiKey });
     const transcription = await openai.audio.transcriptions.create({
@@ -178,8 +196,8 @@ export async function transcribeAudio(audioUrl: string, apiKey: string): Promise
     console.log(`[VoiceService] Whisper transcription complete: "${transcription.text}"`);
     return transcription.text;
   } catch (error: any) {
-    console.error('Whisper transcription failed:', error.message || error);
-    throw new Error(`Whisper transcription failed: ${error.message}`);
+    console.error('Transcription failed:', error.message || error);
+    throw new Error(`Speech-to-Text transcription failed: ${error.message}`);
   } finally {
     // Safely delete temp file
     if (fs.existsSync(tempFilePath)) {
