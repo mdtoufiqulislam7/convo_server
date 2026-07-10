@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import path from 'path';
 import apiRouter from './routes/api';
 import { initializeDatabase } from './config/db';
 
@@ -14,6 +15,9 @@ app.use(cors());
 
 // Parse incoming JSON request payloads
 app.use(express.json());
+
+// Serve static audio responses files
+app.use('/audio', express.static(path.join(__dirname, '../public/audio')));
 
 // Mount the API router
 app.use('/api', apiRouter);

@@ -1,7 +1,8 @@
 import { Request, Response } from 'express';
 import dotenv from 'dotenv';
 import { getAIResponse } from '../services/aiService';
-import { sendFacebookMessage } from '../services/facebookService';
+import { sendFacebookMessage, sendFacebookAudioMessage } from '../services/facebookService';
+import { generateVoice } from '../services/voiceService';
 import { pool } from '../config/db';
 
 dotenv.config();
@@ -50,21 +51,55 @@ export async function receiveWebhookEvent(req: Request, res: Response): Promise<
         }
 
         const senderPsid = webhookEvent.sender?.id;
+        const recipientPageId = webhookEvent.recipient?.id;
         const messageText = webhookEvent.message?.text;
 
         if (senderPsid && messageText) {
-          console.log(`Processing message from PSID ${senderPsid}: "${messageText}"`);
+          console.log(`Processing message from PSID ${senderPsid} to Page ${recipientPageId}: "${messageText}"`);
 
           // Execute smart lookup and AI analysis in the background
           try {
             const aiResponseText = await getAIResponse(messageText);
             console.log(`Generated response: "${aiResponseText}"`);
 
-            // Send reply via Graph API (wrap in try-catch to keep it resilient)
+            // Fetch page voice credentials settings if configured
+            let pageAccessToken = undefined;
+            let voiceEnabled = false;
+            let voiceProvider = 'google';
+            let voiceApiKey = undefined;
+            let voiceLanguage = 'bn';
+
+            if (recipientPageId) {
+              const credsCheck = await pool.query(
+                'SELECT * FROM page_credentials WHERE page_id = $1', 
+                [recipientPageId]
+              );
+              if (credsCheck.rows.length > 0) {
+                const creds = credsCheck.rows[0];
+                pageAccessToken = creds.page_access_token;
+                voiceEnabled = creds.voice_enabled;
+                voiceProvider = creds.voice_provider;
+                voiceApiKey = creds.voice_api_key;
+                voiceLanguage = creds.voice_language;
+              }
+            }
+
+            // Send text reply via Graph API
             try {
-              await sendFacebookMessage(senderPsid, aiResponseText);
+              await sendFacebookMessage(senderPsid, aiResponseText, pageAccessToken);
             } catch (fbErr: any) {
-              console.error('Failed to send message back to Facebook Graph API:', fbErr.message || fbErr);
+              console.error('Failed to send text message back to Facebook Graph API:', fbErr.message || fbErr);
+            }
+
+            // Generate and send spoken audio message if enabled
+            if (voiceEnabled && aiResponseText) {
+              try {
+                const audioPath = await generateVoice(aiResponseText, voiceProvider, voiceApiKey, voiceLanguage);
+                const audioUrl = `https://api.convoes.app${audioPath}`;
+                await sendFacebookAudioMessage(senderPsid, audioUrl, pageAccessToken);
+              } catch (voiceErr: any) {
+                console.error('Failed to send voice message back to Facebook Graph API:', voiceErr.message || voiceErr);
+              }
             }
 
             // Log message history inside database

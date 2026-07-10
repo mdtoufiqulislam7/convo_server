@@ -117,10 +117,24 @@ export async function initializeDatabase() {
         page_id VARCHAR(255),
         page_access_token TEXT,
         verify_token VARCHAR(255),
+        voice_enabled BOOLEAN DEFAULT FALSE,
+        voice_provider VARCHAR(50) DEFAULT 'google',
+        voice_api_key TEXT,
+        voice_language VARCHAR(50) DEFAULT 'bn',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
     console.log('Table "page_credentials" checked/created.');
+
+    // 9. Alter page_credentials table to append voice columns safely if table already exists
+    await client.query(`
+      ALTER TABLE page_credentials 
+      ADD COLUMN IF NOT EXISTS voice_enabled BOOLEAN DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS voice_provider VARCHAR(50) DEFAULT 'google',
+      ADD COLUMN IF NOT EXISTS voice_api_key TEXT,
+      ADD COLUMN IF NOT EXISTS voice_language VARCHAR(50) DEFAULT 'bn';
+    `);
+    console.log('page_credentials table altered to verify voice settings columns.');
 
     // Seed default subscription plans if empty
     const planCheck = await client.query('SELECT COUNT(*) FROM subscription_plans');

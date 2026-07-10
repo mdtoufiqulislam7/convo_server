@@ -110,20 +110,46 @@ export async function upsertUserCredentials(req: AuthenticatedRequest, res: Resp
     return;
   }
 
-  const { pageName, pageId, pageAccessToken, verifyToken } = req.body;
+  const { 
+    pageName, 
+    pageId, 
+    pageAccessToken, 
+    verifyToken,
+    voiceEnabled,
+    voiceProvider,
+    voiceApiKey,
+    voiceLanguage
+  } = req.body;
 
   try {
     const result = await pool.query(
-      `INSERT INTO page_credentials (user_id, page_name, page_id, page_access_token, verify_token) 
-       VALUES ($1, $2, $3, $4, $5) 
+      `INSERT INTO page_credentials (
+         user_id, page_name, page_id, page_access_token, verify_token, 
+         voice_enabled, voice_provider, voice_api_key, voice_language
+       ) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
        ON CONFLICT (user_id) 
        DO UPDATE SET 
          page_name = EXCLUDED.page_name, 
          page_id = EXCLUDED.page_id, 
          page_access_token = EXCLUDED.page_access_token, 
-         verify_token = EXCLUDED.verify_token 
+         verify_token = EXCLUDED.verify_token,
+         voice_enabled = EXCLUDED.voice_enabled,
+         voice_provider = EXCLUDED.voice_provider,
+         voice_api_key = EXCLUDED.voice_api_key,
+         voice_language = EXCLUDED.voice_language
        RETURNING *`,
-      [userId, pageName || '', pageId || '', pageAccessToken || '', verifyToken || '']
+      [
+        userId, 
+        pageName || '', 
+        pageId || '', 
+        pageAccessToken || '', 
+        verifyToken || '',
+        voiceEnabled === true || voiceEnabled === 'true',
+        voiceProvider || 'google',
+        voiceApiKey || '',
+        voiceLanguage || 'bn'
+      ]
     );
 
     res.status(200).json({
