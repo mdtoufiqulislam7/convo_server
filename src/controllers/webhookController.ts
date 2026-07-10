@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import dotenv from 'dotenv';
 import { getAIResponse } from '../services/aiService';
 import { sendFacebookMessage, sendFacebookAudioMessage } from '../services/facebookService';
-import { generateVoice } from '../services/voiceService';
+import { generateVoice, transcribeAudio } from '../services/voiceService';
 import { pool } from '../config/db';
 
 dotenv.config();
@@ -52,17 +52,15 @@ export async function receiveWebhookEvent(req: Request, res: Response): Promise<
 
         const senderPsid = webhookEvent.sender?.id;
         const recipientPageId = webhookEvent.recipient?.id;
-        const messageText = webhookEvent.message?.text;
+        let messageText = webhookEvent.message?.text;
+        const voiceAttachment = webhookEvent.message?.attachments?.find((att: any) => att.type === 'audio');
 
-        if (senderPsid && messageText) {
-          console.log(`Processing message from PSID ${senderPsid} to Page ${recipientPageId}: "${messageText}"`);
+        if (senderPsid && (messageText || voiceAttachment)) {
+          console.log(`Processing event from PSID ${senderPsid} to Page ${recipientPageId}. Has text: ${!!messageText}, Has audio: ${!!voiceAttachment}`);
 
           // Execute smart lookup and AI analysis in the background
           try {
-            const aiResponseText = await getAIResponse(messageText);
-            console.log(`Generated response: "${aiResponseText}"`);
-
-            // Fetch page voice credentials settings if configured
+            // Fetch page credentials settings dynamically to get access token and keys
             let pageAccessToken = undefined;
             let voiceEnabled = false;
             let voiceProvider = 'google';
@@ -83,6 +81,36 @@ export async function receiveWebhookEvent(req: Request, res: Response): Promise<
                 voiceLanguage = creds.voice_language;
               }
             }
+
+            // If it's a voice message, download and transcribe it using Whisper
+            if (voiceAttachment) {
+              const audioUrl = voiceAttachment.payload?.url;
+              const transcriptionKey = voiceApiKey || process.env.OPENAI_API_KEY;
+
+              if (audioUrl && transcriptionKey) {
+                try {
+                  messageText = await transcribeAudio(audioUrl, transcriptionKey);
+                  console.log(`Successfully transcribed user speech message: "${messageText}"`);
+                } catch (transcribeErr: any) {
+                  console.error('Failed to transcribe user voice note:', transcribeErr.message || transcribeErr);
+                }
+              }
+            }
+
+            // Fallback instructions if transcription was empty or key was missing
+            if (!messageText) {
+              try {
+                const fallbackMsg = "আমরা আপনার ভয়েস মেসেজটি পেয়েছি। অনুগ্রহ করে আপনার বার্তাটি লিখে পাঠান যাতে আমাদের এআই অ্যাসিস্ট্যান্ট প্রোডাক্ট খুঁজে দিতে পারে।\n\n(We received your voice clip. Please type your message in text so our assistant can help you!)";
+                await sendFacebookMessage(senderPsid, fallbackMsg, pageAccessToken);
+              } catch (fbErr: any) {
+                console.error('Failed to send fallback text message:', fbErr.message || fbErr);
+              }
+              return;
+            }
+
+            // Process text response
+            const aiResponseText = await getAIResponse(messageText);
+            console.log(`Generated response: "${aiResponseText}"`);
 
             // Send text reply via Graph API
             try {

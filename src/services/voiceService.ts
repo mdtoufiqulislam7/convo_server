@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import axios from 'axios';
+import { OpenAI } from 'openai';
 
 const AUDIO_DIR = path.join(__dirname, '../../public/audio');
 
@@ -134,5 +135,59 @@ export async function generateVoice(
   } catch (error: any) {
     console.error('Google Translate TTS generation failed:', error.message || error);
     throw new Error(`Google Translate TTS failed: ${error.message}`);
+  }
+}
+
+/**
+ * Downloads a voice file from Facebook and transcribes it using OpenAI Whisper.
+ */
+export async function transcribeAudio(audioUrl: string, apiKey: string): Promise<string> {
+  if (!apiKey) {
+    throw new Error('OpenAI API Key is required for speech-to-text transcription.');
+  }
+
+  const filename = `temp-whisper-${crypto.randomUUID()}.mp4`;
+  const tempFilePath = path.join(AUDIO_DIR, filename);
+
+  console.log(`[VoiceService] Downloading audio attachment from Meta CDN: ${audioUrl}...`);
+
+  try {
+    // Download the file via axios stream
+    const response = await axios({
+      method: 'get',
+      url: audioUrl,
+      responseType: 'stream',
+    });
+
+    const writer = fs.createWriteStream(tempFilePath);
+    response.data.pipe(writer);
+
+    await new Promise((resolve, reject) => {
+      writer.on('finish', resolve);
+      writer.on('error', reject);
+    });
+
+    console.log(`[VoiceService] Audio downloaded. Transcribing via OpenAI Whisper...`);
+
+    const openai = new OpenAI({ apiKey: apiKey });
+    const transcription = await openai.audio.transcriptions.create({
+      file: fs.createReadStream(tempFilePath),
+      model: 'whisper-1',
+    });
+
+    console.log(`[VoiceService] Whisper transcription complete: "${transcription.text}"`);
+    return transcription.text;
+  } catch (error: any) {
+    console.error('Whisper transcription failed:', error.message || error);
+    throw new Error(`Whisper transcription failed: ${error.message}`);
+  } finally {
+    // Safely delete temp file
+    if (fs.existsSync(tempFilePath)) {
+      try {
+        fs.unlinkSync(tempFilePath);
+      } catch (err) {
+        console.error('Failed to delete temp whisper audio file:', err);
+      }
+    }
   }
 }
