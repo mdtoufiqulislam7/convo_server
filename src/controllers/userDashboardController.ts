@@ -2,6 +2,47 @@ import { Request, Response } from 'express';
 import { pool } from '../config/db';
 import { AuthenticatedRequest } from './authController';
 
+// Helper to calculate inquiry stats/popularity for a list of products
+async function getProductPopularity(products: any[]): Promise<any[]> {
+  try {
+    const msgsRes = await pool.query('SELECT message_text, response_text FROM chat_messages');
+    const messages = msgsRes.rows;
+
+    if (messages.length === 0 || products.length === 0) {
+      return products.map(p => ({ ...p, popularity_percentage: 0, inquiry_count: 0 }));
+    }
+
+    let totalMatches = 0;
+    const matchCounts = products.map(p => {
+      let count = 0;
+      const keywords = p.keywords || [];
+      for (const msg of messages) {
+        const text = ((msg.message_text || '') + ' ' + (msg.response_text || '')).toLowerCase();
+        const matches = keywords.some((kw: string) => text.includes(kw.toLowerCase()));
+        if (matches) {
+          count++;
+        }
+      }
+      totalMatches += count;
+      return { id: p.id, count };
+    });
+
+    return products.map(p => {
+      const match = matchCounts.find(m => m.id === p.id);
+      const count = match ? match.count : 0;
+      const pct = totalMatches > 0 ? Math.round((count / totalMatches) * 100) : 0;
+      return {
+        ...p,
+        inquiry_count: count,
+        popularity_percentage: pct
+      };
+    });
+  } catch (err) {
+    console.error('Error calculating product popularity:', err);
+    return products.map(p => ({ ...p, popularity_percentage: 0, inquiry_count: 0 }));
+  }
+}
+
 // 1. Get products associated with the user (GET /api/user/products)
 export async function getUserProducts(req: AuthenticatedRequest, res: Response): Promise<void> {
   const userId = req.user?.id;
@@ -19,7 +60,8 @@ export async function getUserProducts(req: AuthenticatedRequest, res: Response):
        ORDER BY p.id DESC`,
       [userId]
     );
-    res.status(200).json({ success: true, products: result.rows });
+    const productsWithStats = await getProductPopularity(result.rows);
+    res.status(200).json({ success: true, products: productsWithStats });
   } catch (error) {
     console.error('Error fetching user products:', error);
     res.status(500).json({ success: false, message: 'Server database query error.' });

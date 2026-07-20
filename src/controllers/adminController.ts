@@ -84,11 +84,53 @@ export async function getLeads(req: AuthenticatedRequest, res: Response): Promis
   }
 }
 
+// Helper to calculate inquiry stats/popularity for a list of products
+async function getProductPopularity(products: any[]): Promise<any[]> {
+  try {
+    const msgsRes = await pool.query('SELECT message_text, response_text FROM chat_messages');
+    const messages = msgsRes.rows;
+
+    if (messages.length === 0 || products.length === 0) {
+      return products.map(p => ({ ...p, popularity_percentage: 0, inquiry_count: 0 }));
+    }
+
+    let totalMatches = 0;
+    const matchCounts = products.map(p => {
+      let count = 0;
+      const keywords = p.keywords || [];
+      for (const msg of messages) {
+        const text = ((msg.message_text || '') + ' ' + (msg.response_text || '')).toLowerCase();
+        const matches = keywords.some((kw: string) => text.includes(kw.toLowerCase()));
+        if (matches) {
+          count++;
+        }
+      }
+      totalMatches += count;
+      return { id: p.id, count };
+    });
+
+    return products.map(p => {
+      const match = matchCounts.find(m => m.id === p.id);
+      const count = match ? match.count : 0;
+      const pct = totalMatches > 0 ? Math.round((count / totalMatches) * 100) : 0;
+      return {
+        ...p,
+        inquiry_count: count,
+        popularity_percentage: pct
+      };
+    });
+  } catch (err) {
+    console.error('Error calculating product popularity:', err);
+    return products.map(p => ({ ...p, popularity_percentage: 0, inquiry_count: 0 }));
+  }
+}
+
 // 6. Get Products list (GET /api/admin/products)
 export async function getProducts(req: AuthenticatedRequest, res: Response): Promise<void> {
   try {
     const result = await pool.query('SELECT * FROM products ORDER BY id DESC');
-    res.status(200).json({ success: true, products: result.rows });
+    const productsWithStats = await getProductPopularity(result.rows);
+    res.status(200).json({ success: true, products: productsWithStats });
   } catch (error) {
     console.error('Admin getProducts error:', error);
     res.status(500).json({ success: false, message: 'Server database query error.' });

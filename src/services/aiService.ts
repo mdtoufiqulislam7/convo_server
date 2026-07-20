@@ -20,20 +20,37 @@ Guidelines:
 6. Keep answers concise, friendly, and suitable for a chat conversation (avoid extremely long paragraphs, use spacing and bullet points where helpful).
 7. If no matching products are found, answer their general questions politely, representing the store professionally.`;
 
-export async function getAIResponse(userMessage: string): Promise<string> {
+export async function getAIResponse(userMessage: string, userId?: number): Promise<string> {
   let catalogContext = '';
   
   try {
-    // Perform a text lookup on our PostgreSQL products table using the user's text keywords
-    const dbResult = await pool.query(
-      `SELECT * FROM products 
-       WHERE keywords IS NOT NULL 
-       AND EXISTS (
-         SELECT 1 FROM unnest(keywords) AS kw 
-         WHERE $1 ILIKE '%' || kw || '%'
-       )`,
-      [userMessage]
-    );
+    let dbResult;
+    if (userId) {
+      // Perform a text lookup on our PostgreSQL products table specifically for this user's products
+      dbResult = await pool.query(
+        `SELECT p.* 
+         FROM products p
+         JOIN user_products up ON p.id = up.product_id
+         WHERE up.user_id = $1
+         AND p.keywords IS NOT NULL 
+         AND EXISTS (
+           SELECT 1 FROM unnest(p.keywords) AS kw 
+           WHERE $2 ILIKE '%' || kw || '%'
+         )`,
+        [userId, userMessage]
+      );
+    } else {
+      // Perform a global lookup as a fallback
+      dbResult = await pool.query(
+        `SELECT * FROM products 
+         WHERE keywords IS NOT NULL 
+         AND EXISTS (
+           SELECT 1 FROM unnest(keywords) AS kw 
+           WHERE $1 ILIKE '%' || kw || '%'
+         )`,
+        [userMessage]
+      );
+    }
 
     if (dbResult.rows.length > 0) {
       catalogContext = 'Matching Product Catalog Items:\n' + dbResult.rows.map((row: any) => {
@@ -43,7 +60,7 @@ export async function getAIResponse(userMessage: string): Promise<string> {
   Description: ${row.description}
   Stock Status: ${row.stock_status}`;
       }).join('\n\n');
-      console.log(`Smart Lookup found ${dbResult.rows.length} product(s).`);
+      console.log(`Smart Lookup found ${dbResult.rows.length} product(s) for user ID ${userId || 'global'}.`);
     } else {
       catalogContext = 'No matching product catalog items found in the database.';
       console.log('Smart Lookup did not match any products.');

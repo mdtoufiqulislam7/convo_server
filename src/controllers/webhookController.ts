@@ -66,6 +66,7 @@ export async function receiveWebhookEvent(req: Request, res: Response): Promise<
             let voiceProvider = 'google';
             let voiceApiKey = undefined;
             let voiceLanguage = 'bn';
+            let pageUserId = undefined;
 
             if (recipientPageId) {
               const credsCheck = await pool.query(
@@ -79,6 +80,7 @@ export async function receiveWebhookEvent(req: Request, res: Response): Promise<
                 voiceProvider = creds.voice_provider;
                 voiceApiKey = creds.voice_api_key;
                 voiceLanguage = creds.voice_language;
+                pageUserId = creds.user_id;
               }
             }
 
@@ -109,7 +111,7 @@ export async function receiveWebhookEvent(req: Request, res: Response): Promise<
             }
 
             // Process text response
-            const aiResponseText = await getAIResponse(messageText);
+            const aiResponseText = await getAIResponse(messageText, pageUserId);
             console.log(`Generated response: "${aiResponseText}"`);
 
             // Send text reply via Graph API
