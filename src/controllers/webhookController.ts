@@ -125,7 +125,11 @@ export async function receiveWebhookEvent(req: Request, res: Response): Promise<
             if (voiceEnabled && aiResponseText) {
               try {
                 const audioPath = await generateVoice(aiResponseText, voiceProvider, voiceApiKey, voiceLanguage);
-                const audioUrl = `https://api.convoes.app${audioPath}`;
+                const host = req.get('host');
+                const protocol = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
+                const serverBaseUrl = process.env.SERVER_URL || `${protocol}://${host}`;
+                const audioUrl = `${serverBaseUrl}${audioPath}`;
+                console.log(`Sending voice message from URL: ${audioUrl}`);
                 await sendFacebookAudioMessage(senderPsid, audioUrl, pageAccessToken);
               } catch (voiceErr: any) {
                 console.error('Failed to send voice message back to Facebook Graph API:', voiceErr.message || voiceErr);

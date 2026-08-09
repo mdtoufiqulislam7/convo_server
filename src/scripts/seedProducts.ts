@@ -6,28 +6,35 @@ export const productsData = [
     price: 700.00,
     description: 'মারিঙ্গা পাউডার। এটি একটি সুপার ফুড মানুষের জন্য, যা মানুষের শরীলে হারানো পুষ্টি ফিরিয়ে আনে। মূল্য: ৭০০ টাকা প্রতি কেজি।',
     stock_status: 'in_stock',
-    keywords: ['মারিঙ্গা পাউডার', 'মোরিঙ্গা পাউডার', 'মারিঙ্গা', 'মোরিঙ্গা', 'সুপার ফুড', 'moringa', 'moringa powder', 'powder', 'পাউডার']
+    keywords: ['মারিঙ্গা পাউডার', 'মোরিঙ্গা পাউডার', 'মারিঙ্গা', 'মোরিঙ্গা', 'সুপার ফুড', 'moringa', 'moringa powder', 'maringa', 'maringa powder', 'powder', 'পাউডার']
+  },
+  {
+    name: 'Premium Ajwa Dates (প্রিমিয়াম আজওয়া খেজুর)',
+    price: 1200.00,
+    description: '১০০% প্রিমিয়াম কোয়ালিটির মদিনার আজওয়া খেজুর। অত্যন্ত সুস্বাদু ও পুষ্টিগুণে ভরপুর। অর্গানিক উপায়ে সংগৃহীত ও প্রক্রিয়াজাতকৃত। ক্যাশ অন ডেলিভারি সুবিধা রয়েছে।',
+    stock_status: 'in_stock',
+    keywords: ['ajwa dates', 'ajwa khejur', 'ajwa', 'আজওয়া', 'আজওয়া খেজুর', 'আজওয়া', 'আজওয়া খেজুর', 'মদিনার আজওয়া']
   },
   {
     name: 'মরিয়ম খেজুর (Maryam Dates)',
     price: 1250.00,
     description: 'মিশর থেকে সুপার কোয়ালিটির মরিয়ম খেজুর পেয়ে যাবেন আমাদের সুন্নাহ ফুড বিডি তে। মূল্য: ১২৫০ টাকা প্রতি কেজি।',
     stock_status: 'in_stock',
-    keywords: ['মরিয়ম খেজুর', 'মরিয়ম খেজুর', 'মরিয়ম', 'মরিয়ম', 'মিশরীয় খেজুর', 'মিশর', 'maryam dates', 'mariyom dates', 'dates', 'খেজুরে', 'তারিখ']
+    keywords: ['মরিয়ম খেজুর', 'মরিয়ম খেজুর', 'মরিয়ম', 'মরিয়ম', 'মিশরীয় খেজুর', 'মিশর', 'maryam dates', 'mariyom dates', 'moriom', 'moriom khejur', 'moriom dates', 'marium', 'marium khejur', 'maryam', 'maryam khejur']
   },
   {
     name: 'কালো কিসমিস (Black Raisins)',
     price: 1050.00,
     description: 'পাকিস্তান এর বাগান থেকে নিয়ে এসেছি বিখ্যাত কালো কিসমিস। মূল্য: ১০৫০ টাকা প্রতি কেজি।',
     stock_status: 'in_stock',
-    keywords: ['কালো কিসমিস', 'কিসমিস', 'কিশমিশ', 'কালো কিশমিশ', 'পাকিস্তান কিসমিস', 'kalo kismis', 'kismis', 'raisins', 'black raisins']
+    keywords: ['কালো কিসমিস', 'কিসমিস', 'কিশমিশ', 'কালো কিশমিশ', 'পাকিস্তান কিসমিস', 'kalo kismis', 'kismis', 'kishmish', 'raisins', 'black raisins']
   },
   {
     name: 'কাঠের ঘানির সরিষার তেল (Mustard Oil)',
     price: 320.00,
     description: 'দেশি সরিষার কাঠের ঘানি তে ভাঙা প্রথম চাপের সরিষার তেল। মূল্য: ৩২০ টাকা প্রতি লিটার।',
     stock_status: 'in_stock',
-    keywords: ['সরিষার তেল', 'ঘানির তেল', 'কাঠের ঘানি', 'সরিষা তেল', 'সরিষা', 'প্রথম চাপ', 'sorishar tel', 'mustard oil', 'oil', 'তেল']
+    keywords: ['সরিষার তেল', 'ঘানির তেল', 'কাঠের ঘানি', 'সরিষা তেল', 'সরিষা', 'প্রথম চাপ', 'sorishar tel', 'sorisha tel', 'mustard oil', 'oil', 'তেল']
   },
   {
     name: 'গাওয়া ঘি (Pure Ghee)',
@@ -41,7 +48,7 @@ export const productsData = [
     price: 2200.00,
     description: 'সৌদি আরব এর বাগান থেকে বাছাই কৃত সেরা মেডজুল খেজুর। নিজস্ব তত্বাবধানে যত্নের সাথে মোড়কজাত করে পৌঁছে দিচ্ছি আপনার ঘরে। মূল্য: ২২০০ টাকা প্রতি কেজি।',
     stock_status: 'in_stock',
-    keywords: ['মেডজুল খেজুর', 'মেডজুল', 'সৌদি খেজুর', 'সৌদি আরব', 'medjool dates', 'medjool', 'medjul', 'medjool khejur']
+    keywords: ['মেডজুল খেজুর', 'মেডজুল', 'সৌদি খেজুর', 'সৌদি আরব', 'medjool dates', 'medjool', 'medjul', 'medjool khejur', 'medjul khejur', 'medjool dates']
   },
   {
     name: 'আখের লাল চিনি (Organic Red Cane Sugar)',
