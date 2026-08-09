@@ -110,29 +110,33 @@ export async function receiveWebhookEvent(req: Request, res: Response): Promise<
               return;
             }
 
-            // Process text response
+            // Process response generation
             const aiResponseText = await getAIResponse(messageText, pageUserId, senderPsid);
             console.log(`Generated response: "${aiResponseText}"`);
 
-            // Send text reply via Graph API
-            try {
-              await sendFacebookMessage(senderPsid, aiResponseText, pageAccessToken);
-            } catch (fbErr: any) {
-              console.error('Failed to send text message back to Facebook Graph API:', fbErr.message || fbErr);
-            }
+            const isVoiceInput = !!voiceAttachment;
 
-            // Generate and send spoken audio message if enabled
-            if (voiceEnabled && aiResponseText) {
+            if (isVoiceInput && voiceEnabled && aiResponseText) {
+              // Send ONLY voice response for voice message inputs
               try {
                 const audioPath = await generateVoice(aiResponseText, voiceProvider, voiceApiKey, voiceLanguage);
                 const host = req.get('host');
                 const protocol = req.protocol === 'https' || req.get('x-forwarded-proto') === 'https' ? 'https' : 'http';
                 const serverBaseUrl = process.env.SERVER_URL || `${protocol}://${host}`;
                 const audioUrl = `${serverBaseUrl}${audioPath}`;
-                console.log(`Sending voice message from URL: ${audioUrl}`);
+                console.log(`Sending voice message response from URL: ${audioUrl}`);
                 await sendFacebookAudioMessage(senderPsid, audioUrl, pageAccessToken);
               } catch (voiceErr: any) {
-                console.error('Failed to send voice message back to Facebook Graph API:', voiceErr.message || voiceErr);
+                console.error('Failed to send voice message back to Facebook Graph API, falling back to text:', voiceErr.message || voiceErr);
+                // Fallback to text message if voice generation or sending fails
+                await sendFacebookMessage(senderPsid, aiResponseText, pageAccessToken);
+              }
+            } else {
+              // Send ONLY text response for text inputs
+              try {
+                await sendFacebookMessage(senderPsid, aiResponseText, pageAccessToken);
+              } catch (fbErr: any) {
+                console.error('Failed to send text message back to Facebook Graph API:', fbErr.message || fbErr);
               }
             }
 
