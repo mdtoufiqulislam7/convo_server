@@ -185,7 +185,16 @@ export async function processOrderSubmission(
 
   const customerName = orderData.customerName?.trim();
   const phone = orderData.phone?.trim();
-  const email = orderData.email?.trim() || '';
+  let email = orderData.email?.trim() || '';
+
+  // Fail-safe raw email scan if email was missing from structured parsing
+  if (!email || !email.includes('@')) {
+    const rawEmailMatch = messageText.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/);
+    if (rawEmailMatch) {
+      email = rawEmailMatch[0].trim();
+    }
+  }
+
   let fullAddress = orderData.fullAddress?.trim() || '';
   const thanaUpazila = orderData.thanaUpazila?.trim() || '';
   const district = orderData.district?.trim() || '';

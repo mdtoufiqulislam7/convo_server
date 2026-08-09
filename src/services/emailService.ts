@@ -7,10 +7,15 @@ const EMAIL_USER = process.env.EMAIL_USER;
 const EMAIL_PASS = process.env.EMAIL_PASS;
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true,
   auth: {
     user: EMAIL_USER,
     pass: EMAIL_PASS,
+  },
+  tls: {
+    rejectUnauthorized: false,
   },
 });
 
@@ -67,7 +72,7 @@ export async function sendOrderConfirmationEmail(details: OrderEmailDetails): Pr
 
   const mailOptions = {
     from: `"Sunnah Food BD" <${EMAIL_USER}>`,
-    to: details.email,
+    to: details.email.trim(),
     subject: `Order Confirmation ${details.orderId ? `#${details.orderId}` : ''} - Sunnah Food BD`,
     html: htmlContent,
   };
