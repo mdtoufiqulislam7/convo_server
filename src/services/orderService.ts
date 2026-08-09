@@ -10,6 +10,7 @@ export interface ExtractedOrderData {
   fullAddress?: string;
   thanaUpazila?: string;
   district?: string;
+  productDetails?: string;
 }
 
 export function parseOrderTextRegex(text: string): ExtractedOrderData | null {
@@ -64,6 +65,13 @@ export function parseOrderTextRegex(text: string): ExtractedOrderData | null {
       let val = districtMatch[1].trim();
       if (val) data.district = val;
     }
+
+    // Match Product Details / Order Items if mentioned
+    const productMatch = line.match(/^(?:পণ্য|প্রোডাক্ট|পণ্যসমূহ|Product|Item|Product Details)\s*[:|-]\s*(.+)$/i);
+    if (productMatch && productMatch[1] && !data.productDetails) {
+      let val = productMatch[1].trim();
+      if (val) data.productDetails = val;
+    }
   }
 
   // Fallbacks for Phone and Email if missing from Key-Value
@@ -99,7 +107,7 @@ export async function extractOrderDataWithLLM(text: string): Promise<ExtractedOr
   }
 
   const prompt = `You are a smart order extraction system for an e-commerce store.
-Analyze the customer's message below to determine if it contains order submission details (such as customer name, mobile phone number, delivery address, email, thana/upazila, district).
+Analyze the customer's message below to determine if it contains order submission details (such as customer name, mobile phone number, delivery address, email, thana/upazila, district, and product name/items being ordered).
 
 Customer Message:
 """
@@ -115,7 +123,8 @@ Return ONLY a valid JSON object in this exact format (no markdown formatting, no
   "email": "extracted email or empty string",
   "fullAddress": "extracted full address or empty string",
   "thanaUpazila": "extracted thana or upazila or empty string",
-  "district": "extracted district or empty string"
+  "district": "extracted district or empty string",
+  "productDetails": "extracted product name, items or quantity ordered if mentioned, or empty string"
 }
 
 If the message is NOT an order submission (for example, just asking "price koto?" or "I want to order"):
@@ -154,6 +163,7 @@ Return ONLY:
           fullAddress: parsed.fullAddress || undefined,
           thanaUpazila: parsed.thanaUpazila || undefined,
           district: parsed.district || undefined,
+          productDetails: parsed.productDetails || undefined,
         };
       }
     }
@@ -198,6 +208,7 @@ export async function processOrderSubmission(
   let fullAddress = orderData.fullAddress?.trim() || '';
   const thanaUpazila = orderData.thanaUpazila?.trim() || '';
   const district = orderData.district?.trim() || '';
+  const productDetails = orderData.productDetails?.trim() || '';
 
   // If thana/district are present but fullAddress is short, combine them into fullAddress
   if (!fullAddress && (thanaUpazila || district)) {
@@ -218,10 +229,10 @@ export async function processOrderSubmission(
 
   try {
     const result = await pool.query(
-      `INSERT INTO product_orders (sender_id, customer_name, phone, email, full_address, thana_upazila, district, raw_message)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO product_orders (sender_id, customer_name, phone, email, full_address, thana_upazila, district, product_details, raw_message)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING id, created_at`,
-      [senderId || null, customerName, phone, email, fullAddress, thanaUpazila, district, messageText]
+      [senderId || null, customerName, phone, email, fullAddress, thanaUpazila, district, productDetails || null, messageText]
     );
 
     const newOrder = result.rows[0];
@@ -246,7 +257,9 @@ export async function processOrderSubmission(
       }
     }
 
-    const responseText = `আপনার তথ্য প্রদানের জন্য ধন্যবাদ! আপনার অর্ডারটি সফলভাবে গ্রহণ করা হয়েছে। 🎉\n\nঅর্ডার নং: #${orderId}\nনাম: ${customerName}\nমোবাইল নম্বর: ${phone}\nঠিকানা: ${fullAddress}${emailStatusMessage}\n\nআমাদের প্রতিনিধি ডেলিভারির জন্য দ্রুত আপনার সাথে যোগাযোগ করবেন। Sunnah Food BD-এর সাথে থাকার জন্য ধন্যবাদ!`;
+    const productLine = productDetails ? `\nপণ্য: ${productDetails}` : '';
+
+    const responseText = `আপনার তথ্য প্রদানের জন্য ধন্যবাদ! আপনার অর্ডারটি সফলভাবে গ্রহণ করা হয়েছে। 🎉\n\nঅর্ডার নং: #${orderId}${productLine}\nনাম: ${customerName}\nমোবাইল নম্বর: ${phone}\nঠিকানা: ${fullAddress}${emailStatusMessage}\n\nআমাদের প্রতিনিধি ডেলিভারির জন্য দ্রুত আপনার সাথে যোগাযোগ করবেন। Sunnah Food BD-এর সাথে থাকার জন্য ধন্যবাদ!`;
 
     return {
       isOrder: true,

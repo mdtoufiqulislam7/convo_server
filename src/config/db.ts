@@ -134,11 +134,17 @@ export async function initializeDatabase() {
         thana_upazila VARCHAR(255),
         district VARCHAR(255),
         order_status VARCHAR(50) DEFAULT 'pending',
+        product_details TEXT,
         raw_message TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
     console.log('Table "product_orders" checked/created.');
+
+    await client.query(`
+      ALTER TABLE product_orders 
+      ADD COLUMN IF NOT EXISTS product_details TEXT;
+    `);
 
     // 8. Create page_credentials table
     await client.query(`
