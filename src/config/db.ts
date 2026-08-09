@@ -198,6 +198,28 @@ export async function initializeDatabase() {
       console.log('Seeding completed. Credentials: admin@convoes.app / admin123');
     }
 
+    // Seed default products catalog if empty
+    const productCheck = await client.query('SELECT COUNT(*) FROM products');
+    if (parseInt(productCheck.rows[0].count, 10) === 0) {
+      console.log('Seeding default products catalog...');
+      const productsData = [
+        ['মারিঙ্গা পাউডার (Moringa Powder)', 700.00, 'মারিঙ্গা পাউডার। এটি একটি সুপার ফুড মানুষের জন্য, যা মানুষের শরীলে হারানো পুষ্টি ফিরিয়ে আনে। মূল্য: ৭০০ টাকা প্রতি কেজি।', 'in_stock', ['মারিঙ্গা পাউডার', 'মোরিঙ্গা পাউডার', 'মারিঙ্গা', 'মোরিঙ্গা', 'সুপার ফুড', 'moringa', 'moringa powder', 'powder', 'পাউডার']],
+        ['মরিয়ম খেজুর (Maryam Dates)', 1250.00, 'মিশর থেকে সুপার কোয়ালিটির মরিয়ম খেজুর পেয়ে যাবেন আমাদের সুন্নাহ ফুড বিডি তে। মূল্য: ১২৫০ টাকা প্রতি কেজি।', 'in_stock', ['মরিয়ম খেজুর', 'মরিয়ম খেজুর', 'মরিয়ম', 'মরিয়ম', 'মিশরীয় খেজুর', 'মিশর', 'maryam dates', 'mariyom dates', 'dates', 'খেজুরে', 'খেজুর']],
+        ['কালো কিসমিস (Black Raisins)', 1050.00, 'পাকিস্তান এর বাগান থেকে নিয়ে এসেছি বিখ্যাত কালো কিসমিস। মূল্য: ১০৫০ টাকা প্রতি কেজি।', 'in_stock', ['কালো কিসমিস', 'কিসমিস', 'কিশমিশ', 'কালো কিশমিশ', 'পাকিস্তান কিসমিস', 'kalo kismis', 'kismis', 'raisins', 'black raisins']],
+        ['কাঠের ঘানির সরিষার তেল (Mustard Oil)', 320.00, 'দেশি সরিষার কাঠের ঘানি তে ভাঙা প্রথম চাপের সরিষার তেল। মূল্য: ৩২০ টাকা প্রতি লিটার।', 'in_stock', ['সরিষার তেল', 'ঘানির তেল', 'কাঠের ঘানি', 'সরিষা তেল', 'সরিষা', 'প্রথম চাপ', 'sorishar tel', 'mustard oil', 'oil', 'তেল']],
+        ['গাওয়া ঘি (Pure Ghee)', 1600.00, 'সুন্নাহ ফুড এর গাওয়া ঘি। দেশি গরুর খাঁটি দুধ দিয়ে মিষ্টি কড়া জালের ঘি। পুষ্টিগত মান ঠিক রেখে আমরাই দিচ্ছি খাঁটি গাওয়া ঘি। মূল্য: ১৬০০ টাকা প্রতি কেজি।', 'in_stock', ['গাওয়া ঘি', 'গাওয়া ঘি', 'ঘি', 'খাঁটি ঘি', 'গাওয়া', 'ghee', 'gawa ghee', 'pure ghee']],
+        ['মেডজুল খেজুর (Medjool Dates)', 2200.00, 'সৌদি আরব এর বাগান থেকে বাছাই কৃত সেরা মেডজুল খেজুর। নিজস্ব তত্বাবধানে যত্নের সাথে মোড়কজাত করে পৌঁছে দিচ্ছি আপনার ঘরে। মূল্য: ২২০০ টাকা প্রতি কেজি।', 'in_stock', ['মেডজুল খেজুর', 'মেডজুল', 'সৌদি খেজুর', 'সৌদি আরব', 'medjool dates', 'medjool', 'dates', 'খেজুর']]
+      ];
+
+      for (const p of productsData) {
+        await client.query(`
+          INSERT INTO products (name, price, description, stock_status, keywords)
+          VALUES ($1, $2, $3, $4, $5)
+        `, p);
+      }
+      console.log('Default products catalog seeded successfully.');
+    }
+
   } catch (error) {
     console.error('Error during database table initialization:', error);
     throw error;

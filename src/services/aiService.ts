@@ -11,7 +11,7 @@ Your goal is to answer customer questions accurately, politely, and helpfully ba
 
 Guidelines:
 1. Always respond in the same language the customer uses (e.g., Bengali or English).
-2. If the user's message matches any products in our database, use those product details (name, price, description, stock status) to answer their question.
+2. If the user's message matches any products in our database, use those specific product details (name, price, description, stock status) to answer their question accurately.
 3. **Fixed Price Policy (একদাম নীতি)**: If the user asks for a discount, to reduce the price, or says "price kom rakha jabe?" (প্রাইজ কম রাখা যাবে?), answer politely that **our prices are fixed and non-negotiable** because we do not compromise on the premium organic quality of our foods. Explain that we prioritize 100% premium quality (১০০% প্রিমিয়াম কোয়ালিটি).
 4. **Delivery Policy (ডেলিভারি সংক্রান্ত তথ্য)**: If the user asks when they will receive the product ("delivery diya jabe kobe / delivery kobe pabo?"), explain that:
    - Inside Dhaka: Delivery takes 1 to 2 days (১-২ দিন).
@@ -34,7 +34,10 @@ Guidelines:
 জেলা:
 
 6. Keep answers concise, friendly, and suitable for a chat conversation (avoid extremely long paragraphs, use spacing and bullet points where helpful).
-7. If no matching products are found, answer their general questions politely, representing the store professionally.`;
+7. If no matching products are found, answer their general questions politely, representing the store professionally.
+8. **Owner Information (মালিক সংক্রান্ত তথ্য)**: If anyone asks who the owner, founder, developer, or creator is (e.g., "who is your owner?", "owner ke?", "মালিক কে?"), respond with:
+Owner name: Md Toufiqul Islam
+info: http://mdtoufiq.netlify.app/`;
 
 export async function getAIResponse(userMessage: string, userId?: number, senderId?: string): Promise<string> {
   // First, check if the customer is submitting completed order information
@@ -52,41 +55,51 @@ export async function getAIResponse(userMessage: string, userId?: number, sender
   try {
     let dbResult;
     if (userId) {
-      // Perform a text lookup on our PostgreSQL products table specifically for this user's products
+      // 1. Primary lookup on mapped products for this user, ranked by maximum keyword match length
       dbResult = await pool.query(
-        `SELECT p.* 
+        `SELECT p.*, MAX(LENGTH(kw.val)) as max_kw_len
          FROM products p
          JOIN user_products up ON p.id = up.product_id
+         CROSS JOIN unnest(p.keywords) AS kw(val)
          WHERE up.user_id = $1
          AND p.keywords IS NOT NULL 
-         AND EXISTS (
-           SELECT 1 FROM unnest(p.keywords) AS kw 
-           WHERE $2 ILIKE '%' || kw || '%'
-         )`,
+         AND $2 ILIKE '%' || kw.val || '%'
+         GROUP BY p.id
+         ORDER BY max_kw_len DESC, p.id ASC`,
         [userId, userMessage]
       );
-    } else {
-      // Perform a global lookup as a fallback
+    }
+
+    // 2. Global fallback lookup if user-specific query returned 0 rows or userId was not provided
+    if (!dbResult || dbResult.rows.length === 0) {
       dbResult = await pool.query(
-        `SELECT * FROM products 
-         WHERE keywords IS NOT NULL 
-         AND EXISTS (
-           SELECT 1 FROM unnest(keywords) AS kw 
-           WHERE $1 ILIKE '%' || kw || '%'
-         )`,
+        `SELECT p.*, MAX(LENGTH(kw.val)) as max_kw_len
+         FROM products p
+         CROSS JOIN unnest(p.keywords) AS kw(val)
+         WHERE p.keywords IS NOT NULL 
+         AND $1 ILIKE '%' || kw.val || '%'
+         GROUP BY p.id
+         ORDER BY max_kw_len DESC, p.id ASC`,
         [userMessage]
       );
     }
 
     if (dbResult.rows.length > 0) {
-      catalogContext = 'Matching Product Catalog Items:\n' + dbResult.rows.map((row: any) => {
+      // Filter out low-relevance generic matches if a high-relevance match exists
+      const topMatchLen = parseInt(dbResult.rows[0].max_kw_len, 10);
+      const filteredRows = dbResult.rows.filter((row: any) => {
+        const len = parseInt(row.max_kw_len, 10);
+        return topMatchLen >= 6 ? len >= (topMatchLen - 3) : true;
+      });
+
+      catalogContext = 'Matching Product Catalog Items:\n' + filteredRows.map((row: any) => {
         return `- ID: ${row.id}
   Name: ${row.name}
   Price: ${row.price} BDT
   Description: ${row.description}
   Stock Status: ${row.stock_status}`;
       }).join('\n\n');
-      console.log(`Smart Lookup found ${dbResult.rows.length} product(s) for user ID ${userId || 'global'}.`);
+      console.log(`Smart Ranked Lookup found ${filteredRows.length} relevant product(s) (Top match len: ${topMatchLen}) for user ID ${userId || 'global'}.`);
     } else {
       catalogContext = 'No matching product catalog items found in the database.';
       console.log('Smart Lookup did not match any products.');
