@@ -1,5 +1,7 @@
 import { pool } from '../config/db';
 import { sendOrderConfirmationEmail } from './emailService';
+import { GoogleGenAI } from '@google/genai';
+import { OpenAI } from 'openai';
 
 export interface ExtractedOrderData {
   customerName?: string;
@@ -10,64 +12,61 @@ export interface ExtractedOrderData {
   district?: string;
 }
 
-export function parseOrderText(text: string): ExtractedOrderData | null {
+export function parseOrderTextRegex(text: string): ExtractedOrderData | null {
   if (!text) return null;
 
   const data: ExtractedOrderData = {};
-  const lines = text.split('\n');
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
 
   for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed) continue;
-
-    // Match Name
-    const nameMatch = trimmed.match(/^(?:নাম|Name)\s*[:|-]?\s*(.+)$/i);
+    // Match Name (must require colon with actual value after it)
+    const nameMatch = line.match(/^(?:নাম|Name)\s*[:|-]\s*(.+)$/i);
     if (nameMatch && nameMatch[1] && !data.customerName) {
-      const val = nameMatch[1].replace(/^[:|-]+\s*/, '').trim();
+      const val = nameMatch[1].trim();
       if (val && !val.includes('অর্ডারটি নিশ্চিত করতে') && !val.includes('নিচের তথ্যগুলো')) {
         data.customerName = val;
       }
     }
 
-    // Match Phone (Place longer patterns first)
-    const phoneMatch = trimmed.match(/^(?:মোবাইল\s*নম্বর|মোবাইল|ফোন|Phone|Mobile)\s*[:|-]?\s*(.+)$/i);
+    // Match Phone
+    const phoneMatch = line.match(/^(?:মোবাইল\s*নম্বর|মোবাইল|ফোন|Phone|Mobile)\s*[:|-]\s*(.+)$/i);
     if (phoneMatch && phoneMatch[1] && !data.phone) {
-      let val = phoneMatch[1].replace(/^[:|-]+\s*/, '').trim();
-      data.phone = val;
+      let val = phoneMatch[1].trim();
+      if (val) data.phone = val;
     }
 
-    // Match Email (Place longer patterns first)
-    const emailMatch = trimmed.match(/^(?:ইমেইল\s*(?:\(যদি\s*থাকে\))?|ইমেইল|Email)\s*[:|-]?\s*(.+)$/i);
+    // Match Email
+    const emailMatch = line.match(/^(?:ইমেইল\s*(?:\(যদি\s*থাকে\))?|ইমেইল|Email)\s*[:|-]\s*(.+)$/i);
     if (emailMatch && emailMatch[1] && !data.email) {
-      let val = emailMatch[1].replace(/^[:|-]+\s*/, '').trim();
+      let val = emailMatch[1].trim();
       if (val.includes('@')) {
         data.email = val;
       }
     }
 
     // Match Address
-    const addressMatch = trimmed.match(/^(?:সম্পূর্ণ\s*ঠিকানা|ঠিকানা|Address|Full\s*Address)\s*[:|-]?\s*(.+)$/i);
+    const addressMatch = line.match(/^(?:সম্পূর্ণ\s*ঠিকানা|ঠিকানা|Address|Full\s*Address)\s*[:|-]\s*(.+)$/i);
     if (addressMatch && addressMatch[1] && !data.fullAddress) {
-      let val = addressMatch[1].replace(/^[:|-]+\s*/, '').trim();
-      data.fullAddress = val;
+      let val = addressMatch[1].trim();
+      if (val) data.fullAddress = val;
     }
 
     // Match Thana/Upazila
-    const thanaMatch = trimmed.match(/^(?:থানা\/উপজেলা|থানা|উপজেলা|Thana|Upazila)\s*[:|-]?\s*(.+)$/i);
+    const thanaMatch = line.match(/^(?:থানা\/উপজেলা|থানা|উপজেলা|Thana|Upazila)\s*[:|-]\s*(.+)$/i);
     if (thanaMatch && thanaMatch[1] && !data.thanaUpazila) {
-      let val = thanaMatch[1].replace(/^[:|-]+\s*/, '').trim();
-      data.thanaUpazila = val;
+      let val = thanaMatch[1].trim();
+      if (val) data.thanaUpazila = val;
     }
 
     // Match District
-    const districtMatch = trimmed.match(/^(?:জেলা|District)\s*[:|-]?\s*(.+)$/i);
+    const districtMatch = line.match(/^(?:জেলা|District)\s*[:|-]\s*(.+)$/i);
     if (districtMatch && districtMatch[1] && !data.district) {
-      let val = districtMatch[1].replace(/^[:|-]+\s*/, '').trim();
-      data.district = val;
+      let val = districtMatch[1].trim();
+      if (val) data.district = val;
     }
   }
 
-  // General fallbacks if regex line matching missed phone or email
+  // Fallbacks for Phone and Email if missing from Key-Value
   if (!data.phone) {
     const rawPhoneMatch = text.match(/(?:01[3-9]\d{8}|\+?8801[3-9]\d{8})/);
     if (rawPhoneMatch) {
@@ -82,11 +81,85 @@ export function parseOrderText(text: string): ExtractedOrderData | null {
     }
   }
 
-  // To be considered a valid order submission, we must have at least phone number AND (address OR customer name)
-  if (data.phone && (data.fullAddress || data.customerName)) {
+  // Only return regex match if we have all 3 critical fields (customerName, phone, fullAddress)
+  if (data.phone && data.customerName && data.fullAddress) {
     return data;
   }
 
+  return null;
+}
+
+export async function extractOrderDataWithLLM(text: string): Promise<ExtractedOrderData | null> {
+  let openAIKey = process.env.OPENAI_API_KEY;
+  let geminiKey = process.env.GEMINI_API_KEY || process.env.aistudioapi;
+
+  if (openAIKey && (openAIKey.startsWith('AQ.') || openAIKey.startsWith('AIzaSy'))) {
+    if (!geminiKey) geminiKey = openAIKey;
+    openAIKey = undefined;
+  }
+
+  const prompt = `You are a smart order extraction system for an e-commerce store.
+Analyze the customer's message below to determine if it contains order submission details (such as customer name, mobile phone number, delivery address, email, thana/upazila, district).
+
+Customer Message:
+"""
+${text}
+"""
+
+If the message contains customer order details (especially a phone number or name and address):
+Return ONLY a valid JSON object in this exact format (no markdown formatting, no extra explanation):
+{
+  "isOrder": true,
+  "customerName": "extracted name",
+  "phone": "extracted phone number",
+  "email": "extracted email or empty string",
+  "fullAddress": "extracted full address",
+  "thanaUpazila": "extracted thana or upazila or empty string",
+  "district": "extracted district or empty string"
+}
+
+If the message is NOT an order submission (for example, just asking "price koto?" or "I want to order"):
+Return ONLY:
+{
+  "isOrder": false
+}`;
+
+  try {
+    let jsonString = '';
+    if (geminiKey) {
+      const ai = new GoogleGenAI({ apiKey: geminiKey });
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-lite',
+        contents: prompt,
+      });
+      jsonString = response.text || '';
+    } else if (openAIKey) {
+      const openai = new OpenAI({ apiKey: openAIKey });
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.1,
+      });
+      jsonString = completion.choices[0].message?.content || '';
+    }
+
+    jsonString = jsonString.replace(/```json/g, '').replace(/```/g, '').trim();
+    if (jsonString.startsWith('{')) {
+      const parsed = JSON.parse(jsonString);
+      if (parsed.isOrder && (parsed.phone || parsed.customerName || parsed.fullAddress)) {
+        return {
+          customerName: parsed.customerName || undefined,
+          phone: parsed.phone || undefined,
+          email: parsed.email || undefined,
+          fullAddress: parsed.fullAddress || undefined,
+          thanaUpazila: parsed.thanaUpazila || undefined,
+          district: parsed.district || undefined,
+        };
+      }
+    }
+  } catch (err) {
+    console.error('LLM Order Extraction error:', err);
+  }
   return null;
 }
 
@@ -94,9 +167,19 @@ export async function processOrderSubmission(
   messageText: string,
   senderId?: string
 ): Promise<{ isOrder: boolean; orderId?: number; responseText?: string }> {
-  const orderData = parseOrderText(messageText);
+  // 1. Try fast Regex extraction
+  let orderData = parseOrderTextRegex(messageText);
 
-  if (!orderData) {
+  // 2. If regex did not extract all key fields, use LLM extraction
+  const hasPhone = /(?:01[3-9]\d{8}|\+?8801[3-9]\d{8})/.test(messageText);
+  const hasFormKeywords = /নাম|মোবাইল|ঠিকানা|ইমেইল|জেলা|থানা/i.test(messageText);
+
+  if (!orderData && (hasPhone || hasFormKeywords)) {
+    console.log('Regex order parsing incomplete. Running LLM Order Extractor...');
+    orderData = await extractOrderDataWithLLM(messageText);
+  }
+
+  if (!orderData || (!orderData.phone && !orderData.fullAddress && !orderData.customerName)) {
     return { isOrder: false };
   }
 
@@ -137,7 +220,7 @@ export async function processOrderSubmission(
       }
     }
 
-    const responseText = `অর্ডারটি সফলভাবে গ্রহণ করা হয়েছে! 🎉\n\nঅর্ডার নং: #${orderId}\nনাম: ${customerName}\nমোবাইল নম্বর: ${phone}\nঠিকানা: ${fullAddress}${emailStatusMessage}\n\nআমাদের প্রতিনিধি ডেলিভারির জন্য দ্রুত আপনার সাথে যোগাযোগ করবেন। Sunnah Food BD-এর সাথে থাকার জন্য ধন্যবাদ!`;
+    const responseText = `আপনার তথ্য প্রদানের জন্য ধন্যবাদ! আপনার অর্ডারটি সফলভাবে গ্রহণ করা হয়েছে। 🎉\n\nঅর্ডার নং: #${orderId}\nনাম: ${customerName}\nমোবাইল নম্বর: ${phone}\nঠিকানা: ${fullAddress}${emailStatusMessage}\n\nআমাদের প্রতিনিধি ডেলিভারির জন্য দ্রুত আপনার সাথে যোগাযোগ করবেন। Sunnah Food BD-এর সাথে থাকার জন্য ধন্যবাদ!`;
 
     return {
       isOrder: true,
