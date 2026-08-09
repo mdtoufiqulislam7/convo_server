@@ -34,7 +34,7 @@ export const productsData = [
     price: 1600.00,
     description: 'সুন্নাহ ফুড এর গাওয়া ঘি। দেশি গরুর খাঁটি দুধ দিয়ে মিষ্টি কড়া জালের ঘি। পুষ্টিগত মান ঠিক রেখে আমরাই দিচ্ছি খাঁটি গাওয়া ঘি। মূল্য: ১৬০০ টাকা প্রতি কেজি।',
     stock_status: 'in_stock',
-    keywords: ['গাওয়া ঘি', 'গাওয়া ঘি', 'ঘি', 'খাঁটি ঘি', 'গাওয়া', 'ghee', 'gawa ghee', 'pure ghee']
+    keywords: ['গাওয়া ঘি', 'গাওয়া ঘি', 'ঘি', 'খাঁটি ঘি', 'গাওয়া', 'ghee', 'gawa ghee', 'pure ghee', 'ghie', 'ghi']
   },
   {
     name: 'মেডজুল খেজুর (Medjool Dates)',
@@ -42,6 +42,20 @@ export const productsData = [
     description: 'সৌদি আরব এর বাগান থেকে বাছাই কৃত সেরা মেডজুল খেজুর। নিজস্ব তত্বাবধানে যত্নের সাথে মোড়কজাত করে পৌঁছে দিচ্ছি আপনার ঘরে। মূল্য: ২২০০ টাকা প্রতি কেজি।',
     stock_status: 'in_stock',
     keywords: ['মেডজুল খেজুর', 'মেডজুল', 'সৌদি খেজুর', 'সৌদি আরব', 'medjool dates', 'medjool', 'medjul', 'medjool khejur']
+  },
+  {
+    name: 'আখের লাল চিনি (Organic Red Cane Sugar)',
+    price: 250.00,
+    description: 'আমাদের সুন্নাহ ফুড বিডি তে পেয়ে যাবেন আখের লাল চিনি। এটি ১০০% অর্গানিক এবং ভেজাল মুক্ত। মূল্য: ২৫০ টাকা প্রতি কেজি।',
+    stock_status: 'in_stock',
+    keywords: ['আখের লাল চিনি', 'আখের চিনি', 'লাল চিনি', 'চিনি', 'অর্গানিক চিনি', 'red sugar', 'cane sugar', 'sugar', 'akher chini', 'lal chini', 'chini']
+  },
+  {
+    name: 'ফ্রেশ পেস্তা বাদাম (Fresh Pistachio Nuts)',
+    price: 2850.00,
+    description: 'দুবাই থেকে নিয়ে আসলাম ফ্রেশ পেস্তা বাদাম। মূল্য: ২৮৫০ টাকা প্রতি কেজি।',
+    stock_status: 'in_stock',
+    keywords: ['পেস্তা বাদাম', 'পেস্তাবাদাম', 'পেস্তা', 'বাদাম', 'দুবাই পেস্তা বাদাম', 'pistachio', 'pistachio nuts', 'pesta badam', 'badam', 'nuts']
   }
 ];
 

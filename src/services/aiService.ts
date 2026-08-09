@@ -37,7 +37,27 @@ Guidelines:
 7. If no matching products are found, answer their general questions politely, representing the store professionally.
 8. **Owner Information (মালিক সংক্রান্ত তথ্য)**: If anyone asks who the owner, founder, developer, or creator is (e.g., "who is your owner?", "owner ke?", "মালিক কে?"), respond with:
 Owner name: Md Toufiqul Islam
-info: http://mdtoufiq.netlify.app/`;
+info: http://mdtoufiq.netlify.app/
+9. **Quantity & Total Price Calculation (পরিমাণ ও মোট মূল্য হিসাব)**:
+   - If the customer asks for a specific quantity (e.g., 1 kg, 5 kg, 500 gm, 2 liters, 3 kg, etc.):
+     - State the per-unit price (per kg/liter) from the product catalog.
+     - Calculate and explicitly state the TOTAL price for the requested quantity (e.g., for 5 kg ghee at 1600 BDT/kg: "১ কেজির দাম ১৬০০ টাকা। সুতরাং ৫ কেজির মোট দাম = ১৬০০ × ৫ = ৮০০০ টাকা।").`;
+
+function cleanMessageForSearch(text: string): { searchMessage: string; detectedQuantity?: string } {
+  // Regex to detect quantity expressions like "5kg", "5 kg", "500gm", "2 liter", "১ কেজি", "৫ কেজি"
+  const qtyRegex = /(?:(\d+(?:\.\d+)?|[০-৯]+(?:\.[০-৯]+)?)\s*(?:kg|কেজি|g|gm|gram|গ্রাম|liter|litre|লিটার|l|পিস|টি))/gi;
+  const matches = text.match(qtyRegex);
+  
+  const detectedQuantity = matches ? matches.join(', ') : undefined;
+  
+  // Remove quantity expressions from SQL search message so matching isn't hindered
+  let searchMessage = text.replace(qtyRegex, ' ').replace(/\s+/g, ' ').trim();
+  if (!searchMessage || searchMessage.length < 2) {
+    searchMessage = text;
+  }
+  
+  return { searchMessage, detectedQuantity };
+}
 
 export async function getAIResponse(userMessage: string, userId?: number, senderId?: string): Promise<string> {
   // First, check if the customer is submitting completed order information
@@ -49,6 +69,8 @@ export async function getAIResponse(userMessage: string, userId?: number, sender
   } catch (orderErr) {
     console.error('Error checking order submission in aiService:', orderErr);
   }
+
+  const { searchMessage, detectedQuantity } = cleanMessageForSearch(userMessage);
 
   let catalogContext = '';
   
@@ -66,7 +88,7 @@ export async function getAIResponse(userMessage: string, userId?: number, sender
          AND $2 ILIKE '%' || kw.val || '%'
          GROUP BY p.id
          ORDER BY max_kw_len DESC, p.id ASC`,
-        [userId, userMessage]
+        [userId, searchMessage]
       );
     }
 
@@ -80,7 +102,7 @@ export async function getAIResponse(userMessage: string, userId?: number, sender
          AND $1 ILIKE '%' || kw.val || '%'
          GROUP BY p.id
          ORDER BY max_kw_len DESC, p.id ASC`,
-        [userMessage]
+        [searchMessage]
       );
     }
 
@@ -99,7 +121,12 @@ export async function getAIResponse(userMessage: string, userId?: number, sender
   Description: ${row.description}
   Stock Status: ${row.stock_status}`;
       }).join('\n\n');
-      console.log(`Smart Ranked Lookup found ${filteredRows.length} relevant product(s) (Top match len: ${topMatchLen}) for user ID ${userId || 'global'}.`);
+
+      if (detectedQuantity) {
+        catalogContext += `\n\nCustomer Requested Quantity: "${detectedQuantity}". Please state the unit price AND calculate the TOTAL price for this quantity.`;
+      }
+
+      console.log(`Smart Ranked Lookup found ${filteredRows.length} relevant product(s) (Top match len: ${topMatchLen}, Requested Qty: ${detectedQuantity || 'none'}) for user ID ${userId || 'global'}.`);
     } else {
       catalogContext = 'No matching product catalog items found in the database.';
       console.log('Smart Lookup did not match any products.');
