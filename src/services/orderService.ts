@@ -19,7 +19,7 @@ export function parseOrderTextRegex(text: string): ExtractedOrderData | null {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
 
   for (const line of lines) {
-    // Match Name (must require colon with actual value after it)
+    // Match Name
     const nameMatch = line.match(/^(?:নাম|Name)\s*[:|-]\s*(.+)$/i);
     if (nameMatch && nameMatch[1] && !data.customerName) {
       const val = nameMatch[1].trim();
@@ -106,14 +106,14 @@ Customer Message:
 ${text}
 """
 
-If the message contains customer order details (especially a phone number or name and address):
+If the message contains customer order details (such as phone number or name or address):
 Return ONLY a valid JSON object in this exact format (no markdown formatting, no extra explanation):
 {
   "isOrder": true,
-  "customerName": "extracted name",
-  "phone": "extracted phone number",
+  "customerName": "extracted name or empty string",
+  "phone": "extracted phone number or empty string",
   "email": "extracted email or empty string",
-  "fullAddress": "extracted full address",
+  "fullAddress": "extracted full address or empty string",
   "thanaUpazila": "extracted thana or upazila or empty string",
   "district": "extracted district or empty string"
 }
@@ -146,7 +146,7 @@ Return ONLY:
     jsonString = jsonString.replace(/```json/g, '').replace(/```/g, '').trim();
     if (jsonString.startsWith('{')) {
       const parsed = JSON.parse(jsonString);
-      if (parsed.isOrder && (parsed.phone || parsed.customerName || parsed.fullAddress)) {
+      if (parsed.isOrder) {
         return {
           customerName: parsed.customerName || undefined,
           phone: parsed.phone || undefined,
@@ -183,12 +183,29 @@ export async function processOrderSubmission(
     return { isOrder: false };
   }
 
-  const customerName = orderData.customerName || 'সম্মানিত গ্রাহক';
-  const phone = orderData.phone || 'N/A';
-  const email = orderData.email || '';
-  const fullAddress = orderData.fullAddress || 'N/A';
-  const thanaUpazila = orderData.thanaUpazila || '';
-  const district = orderData.district || '';
+  const customerName = orderData.customerName?.trim();
+  const phone = orderData.phone?.trim();
+  const email = orderData.email?.trim() || '';
+  let fullAddress = orderData.fullAddress?.trim() || '';
+  const thanaUpazila = orderData.thanaUpazila?.trim() || '';
+  const district = orderData.district?.trim() || '';
+
+  // If thana/district are present but fullAddress is short, combine them into fullAddress
+  if (!fullAddress && (thanaUpazila || district)) {
+    fullAddress = [thanaUpazila, district].filter(Boolean).join(', ');
+  }
+
+  // Check if order details are complete (MUST have customerName, phone, AND fullAddress)
+  const isComplete = Boolean(customerName && phone && fullAddress && fullAddress !== 'N/A' && fullAddress.length >= 3);
+
+  if (!isComplete) {
+    console.log(`Incomplete order submission detected from user (Name: ${customerName}, Phone: ${phone}, Address: ${fullAddress}). Requesting missing details...`);
+    const promptResponse = `অর্ডারটি নিশ্চিত করতে অনুগ্রহ করে আপনার সকল তথ্য (নাম, মোবাইল নম্বর এবং সম্পূর্ণ ঠিকানা) প্রদান করুন:\n\nঅর্ডারটি নিশ্চিত করতে অনুগ্রহ করে নিচের তথ্যগুলো পূরণ করে দিন:\n\nনাম:\n\nমোবাইল নম্বর:\n\nইমেইল (যদি থাকে):\n\nসম্পূর্ণ ঠিকানা:\n\nথানা/উপজেলা:\n\nজেলা:`;
+    return {
+      isOrder: true,
+      responseText: promptResponse,
+    };
+  }
 
   try {
     const result = await pool.query(
@@ -208,8 +225,8 @@ export async function processOrderSubmission(
     if (email && email.includes('@')) {
       const emailSent = await sendOrderConfirmationEmail({
         orderId,
-        customerName,
-        phone,
+        customerName: customerName!,
+        phone: phone!,
         email,
         fullAddress,
         thanaUpazila,
