@@ -9,6 +9,7 @@ import {
   updateUserRole, 
   getPayments, 
   getLeads, 
+  getOrders,
   getProducts, 
   createProduct 
 } from '../controllers/adminController';
@@ -51,6 +52,7 @@ router.get('/admin/users', authenticateToken, requireAdmin, getUsers);
 router.post('/admin/users/:id/role', authenticateToken, requireAdmin, updateUserRole);
 router.get('/admin/payments', authenticateToken, getPayments);
 router.get('/admin/leads', authenticateToken, requireAdmin, getLeads);
+router.get('/admin/orders', authenticateToken, requireAdmin, getOrders);
 router.get('/admin/products', authenticateToken, requireAdmin, getProducts);
 router.post('/admin/products', authenticateToken, requireAdmin, createProduct);
 

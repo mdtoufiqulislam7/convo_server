@@ -2,6 +2,7 @@ import { pool } from '../config/db';
 import { OpenAI } from 'openai';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
+import { processOrderSubmission } from './orderService';
 
 dotenv.config();
 
@@ -16,11 +17,35 @@ Guidelines:
    - Inside Dhaka: Delivery takes 1 to 2 days (১-২ দিন).
    - Outside Dhaka: Delivery takes 3 to 4 days (৩-৪ দিন).
    - Delivery is Cash on Delivery (ক্যাশ অন ডেলিভারি). Customers can inspect the product quality before paying.
-5. If the user wants to order, guide them to write their full address and mobile phone number, or call 01866733279. Note that Cash on Delivery is available with 100% premium quality check.
+5. **Product Order Procedure (অর্ডার করার প্রক্রিয়া)**: Whenever the customer asks or expresses interest in ordering any product (e.g., "অর্ডার করতে চাই", "আমি নিতে চাই", "কীভাবে অর্ডার করব", "I want to order", "Order this"), you MUST respond using this exact format:
+অর্ডারটি নিশ্চিত করতে অনুগ্রহ করে নিচের তথ্যগুলো পূরণ করে দিন:
+
+নাম:
+
+মোবাইল নম্বর:
+
+ইমেইল (যদি থাকে):
+
+সম্পূর্ণ ঠিকানা:
+
+থানা/উপজেলা:
+
+জেলা: 
+
 6. Keep answers concise, friendly, and suitable for a chat conversation (avoid extremely long paragraphs, use spacing and bullet points where helpful).
 7. If no matching products are found, answer their general questions politely, representing the store professionally.`;
 
-export async function getAIResponse(userMessage: string, userId?: number): Promise<string> {
+export async function getAIResponse(userMessage: string, userId?: number, senderId?: string): Promise<string> {
+  // First, check if the customer is submitting completed order information
+  try {
+    const orderResult = await processOrderSubmission(userMessage, senderId);
+    if (orderResult.isOrder && orderResult.responseText) {
+      return orderResult.responseText;
+    }
+  } catch (orderErr) {
+    console.error('Error checking order submission in aiService:', orderErr);
+  }
+
   let catalogContext = '';
   
   try {

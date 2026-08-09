@@ -97,7 +97,21 @@ export async function initializeDatabase() {
     `);
     console.log('payments table altered to verify subscription_id column.');
 
-    // 7. Create user_products table
+    // 7. Create products table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS products (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        price NUMERIC(10, 2) NOT NULL,
+        description TEXT,
+        stock_status VARCHAR(50) DEFAULT 'in_stock',
+        keywords TEXT[],
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('Table "products" checked/created.');
+
+    // 8. Create user_products table
     await client.query(`
       CREATE TABLE IF NOT EXISTS user_products (
         id SERIAL PRIMARY KEY,
@@ -107,6 +121,24 @@ export async function initializeDatabase() {
       );
     `);
     console.log('Table "user_products" checked/created.');
+
+    // 9. Create product_orders table
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS product_orders (
+        id SERIAL PRIMARY KEY,
+        sender_id VARCHAR(255),
+        customer_name VARCHAR(255) NOT NULL,
+        phone VARCHAR(50) NOT NULL,
+        email VARCHAR(255),
+        full_address TEXT NOT NULL,
+        thana_upazila VARCHAR(255),
+        district VARCHAR(255),
+        order_status VARCHAR(50) DEFAULT 'pending',
+        raw_message TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('Table "product_orders" checked/created.');
 
     // 8. Create page_credentials table
     await client.query(`

@@ -111,7 +111,7 @@ export async function receiveWebhookEvent(req: Request, res: Response): Promise<
             }
 
             // Process text response
-            const aiResponseText = await getAIResponse(messageText, pageUserId);
+            const aiResponseText = await getAIResponse(messageText, pageUserId, senderPsid);
             console.log(`Generated response: "${aiResponseText}"`);
 
             // Send text reply via Graph API

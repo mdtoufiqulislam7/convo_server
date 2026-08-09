@@ -84,6 +84,17 @@ export async function getLeads(req: AuthenticatedRequest, res: Response): Promis
   }
 }
 
+// 5b. Get Product Orders list (GET /api/admin/orders)
+export async function getOrders(req: AuthenticatedRequest, res: Response): Promise<void> {
+  try {
+    const result = await pool.query('SELECT * FROM product_orders ORDER BY created_at DESC');
+    res.status(200).json({ success: true, orders: result.rows });
+  } catch (error) {
+    console.error('Admin getOrders error:', error);
+    res.status(500).json({ success: false, message: 'Server database query error.' });
+  }
+}
+
 // Helper to calculate inquiry stats/popularity for a list of products
 async function getProductPopularity(products: any[]): Promise<any[]> {
   try {
