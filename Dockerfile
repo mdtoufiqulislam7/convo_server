@@ -25,9 +25,11 @@ ENV PORT=5000
 COPY package*.json ./
 RUN npm ci --omit=dev --ignore-scripts
 
-# Copy compiled code and public assets from builder stage
+# Copy compiled code from builder stage
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/public ./public
+
+# Ensure public/audio directories exist
+RUN mkdir -p public/audio
 
 EXPOSE 5000
 
