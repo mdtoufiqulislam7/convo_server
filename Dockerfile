@@ -3,11 +3,11 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# Copy dependency definitions
+# Copy dependency definitions and tsconfig
 COPY package*.json tsconfig.json ./
 
-# Install dependencies
-RUN npm ci
+# Install dependencies (ignore-scripts prevents premature build before source code is copied)
+RUN npm ci --ignore-scripts
 
 # Copy source code and build TypeScript to JS
 COPY . .
@@ -23,7 +23,7 @@ ENV PORT=5000
 
 # Copy package files and install only production dependencies
 COPY package*.json ./
-RUN npm ci --only=production
+RUN npm ci --omit=dev --ignore-scripts
 
 # Copy compiled code and public assets from builder stage
 COPY --from=builder /app/dist ./dist
