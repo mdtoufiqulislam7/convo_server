@@ -13,6 +13,8 @@ export const pool = new Pool({
   ssl: process.env.DB_SSL === 'require' ? { rejectUnauthorized: false } : undefined,
 });
 
+//now deploy
+
 // Helper function to hash password with SHA-256
 export function hashPassword(password: string): string {
   return crypto.createHash('sha256').update(password).digest('hex');
@@ -22,7 +24,7 @@ export async function initializeDatabase() {
   const client = await pool.connect();
   try {
     console.log('Initializing database tables...');
-    
+
     // 1. Create chat_messages table
     await client.query(`
       CREATE TABLE IF NOT EXISTS chat_messages (
