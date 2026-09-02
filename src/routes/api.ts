@@ -20,6 +20,7 @@ import {
   upsertUserCredentials,
   getSubscriptionPlans
 } from '../controllers/userDashboardController';
+import { getRedisAnalytics, flushAndRewarmRedis } from '../controllers/redisAnalyticsController';
 
 const router = Router();
 
@@ -46,7 +47,11 @@ router.post('/user/products', authenticateToken, createUserProduct);
 router.get('/user/credentials', authenticateToken, getUserCredentials);
 router.post('/user/credentials', authenticateToken, upsertUserCredentials);
 
-// --- 6. Protected Admin Operations Endpoints ---
+// --- 6. Redis In-Memory Cache Analytics & Control Endpoints ---
+router.get('/redis/analytics', getRedisAnalytics);
+router.post('/redis/flush', flushAndRewarmRedis);
+
+// --- 7. Protected Admin Operations Endpoints ---
 router.get('/admin/messages', authenticateToken, requireAdmin, getMessages);
 router.get('/admin/users', authenticateToken, requireAdmin, getUsers);
 router.post('/admin/users/:id/role', authenticateToken, requireAdmin, updateUserRole);
