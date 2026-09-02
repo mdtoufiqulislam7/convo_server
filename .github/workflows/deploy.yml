@@ -1,4 +1,4 @@
-name: CI/CD Docker Deploy to AWS EC2
+name: Private Build & Deploy to AWS EC2 (No Docker Hub)
 
 on:
   push:
@@ -8,55 +8,60 @@ on:
 
 env:
   IMAGE_NAME: convo-server
+  TARGET_DIR: /home/toufiqpc/convoai
 
 jobs:
-  build-and-deploy:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+      - name: Copy project files to AWS EC2 via SCP
+        uses: appleboy/scp-action@v0.1.7
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          # If using SSH Password instead of Key, uncomment password line and comment key:
+          # password: ${{ secrets.EC2_PASSWORD }}
+          source: "."
+          target: ${{ env.TARGET_DIR }}
+          rm: false
 
-      - name: Build and Push Docker Image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          push: true
-          tags: |
-            ${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
-            ${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
-
-      - name: Deploy to AWS EC2 via SSH
+      - name: Build & Deploy Docker Container on AWS EC2 via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          # If using SSH Password instead of Key, uncomment password line and comment key:
+          # password: ${{ secrets.EC2_PASSWORD }}
           script: |
-            # Pull latest image from Docker Hub
-            docker pull ${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+            echo "🚀 Starting Local Build & Container Restart on Server..."
 
-            # Stop and remove existing container if running
+            # 1. Navigate to target directory
+            cd ${{ env.TARGET_DIR }}
+
+            # 2. Build Docker image directly on server (100% Private, No Docker Hub!)
+            docker build -t ${{ env.IMAGE_NAME }}:latest .
+
+            # 3. Stop and remove existing container if running
             docker stop ${{ env.IMAGE_NAME }} || true
             docker rm ${{ env.IMAGE_NAME }} || true
 
-            # Run new container with production .env and restart policy
+            # 4. Run new container with production .env file
             docker run -d \
               --name ${{ env.IMAGE_NAME }} \
               --restart unless-stopped \
               -p 5000:5000 \
-              --env-file ~/app/.env \
-              ${{ secrets.DOCKER_USERNAME }}/${{ env.IMAGE_NAME }}:latest
+              --env-file ${{ env.TARGET_DIR }}/.env \
+              ${{ env.IMAGE_NAME }}:latest
 
-            # Clean up old unused images to save disk space
-            docker image prune -af --filter "until=24h"
+            # 5. Clean up old dangling build images
+            docker image prune -f
+
+            echo "✅ Deployment completed successfully!"
+
+

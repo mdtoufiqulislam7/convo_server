@@ -4,6 +4,11 @@ node_modules/
 # Production build output
 dist/
 
+# Security keys & certificates
+*.pem
+*.key
+*.crt
+
 # Local env files (security)
 .env
 .env*.local
