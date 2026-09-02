@@ -3,6 +3,7 @@ import { OpenAI } from 'openai';
 import { GoogleGenAI } from '@google/genai';
 import dotenv from 'dotenv';
 import { processOrderSubmission } from './orderService';
+import { getCache, setCache } from '../config/redis';
 
 dotenv.config();
 

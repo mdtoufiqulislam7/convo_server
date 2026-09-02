@@ -3,7 +3,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
 import apiRouter from './routes/api';
-import { initializeDatabase } from './config/db';
+import { initializeDatabase, pool } from './config/db';
+import { warmupRedisCache } from './config/redis';
 
 dotenv.config();
 
@@ -31,6 +32,9 @@ async function startServer() {
   try {
     // Run database migrations/table creation
     await initializeDatabase();
+    
+    // Pre-warm Redis cache with existing database records
+    await warmupRedisCache(pool);
     
     app.listen(PORT, () => {
       console.log(`=========================================`);

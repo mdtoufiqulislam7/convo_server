@@ -26,6 +26,7 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "ioredis": "^6.0.0",
     "jsonwebtoken": "^9.0.3",
     "nodemailer": "^9.0.5",
     "openai": "^6.45.0",
@@ -35,6 +36,7 @@
     "typescript": "^6.0.3"
   },
   "devDependencies": {
+    "@types/ioredis": "^4.28.10",
     "nodemon": "^3.1.14"
   }
 }

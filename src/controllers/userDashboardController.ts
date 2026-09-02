@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { pool } from '../config/db';
 import { AuthenticatedRequest } from './authController';
+import { getCache, setCache, delCache, delCachePattern } from '../config/redis';
 
 // Helper to calculate inquiry stats/popularity for a list of products
 async function getProductPopularity(products: any[]): Promise<any[]> {
@@ -51,7 +52,18 @@ export async function getUserProducts(req: AuthenticatedRequest, res: Response):
     return;
   }
 
+  const cacheKey = `user:products:${userId}`;
+
   try {
+    // Check Redis cache first (sub-millisecond speed)
+    const cachedProducts = await getCache<any[]>(cacheKey);
+    if (cachedProducts) {
+      console.log(`⚡ [Redis HIT] Loaded products from Redis for User ID ${userId}`);
+      res.status(200).json({ success: true, products: cachedProducts });
+      return;
+    }
+
+    // Cache MISS: Query database
     const result = await pool.query(
       `SELECT p.* 
        FROM products p 
@@ -61,6 +73,11 @@ export async function getUserProducts(req: AuthenticatedRequest, res: Response):
       [userId]
     );
     const productsWithStats = await getProductPopularity(result.rows);
+
+    // Save into Redis cache (1 hour TTL)
+    await setCache(cacheKey, productsWithStats, 3600);
+    console.log(`⚡ Cached products in Redis for User ID ${userId}`);
+
     res.status(200).json({ success: true, products: productsWithStats });
   } catch (error) {
     console.error('Error fetching user products:', error);
@@ -113,6 +130,10 @@ export async function createUserProduct(req: AuthenticatedRequest, res: Response
 
     await client.query('COMMIT');
     
+    // Invalidate Redis product cache for this user
+    await delCache([`user:products:${userId}`, 'products:all']);
+    console.log(`🧹 Invalidated Redis product cache for User ID ${userId}`);
+
     res.status(201).json({
       success: true,
       message: 'Product catalog item created and mapped successfully.',
@@ -193,6 +214,13 @@ export async function upsertUserCredentials(req: AuthenticatedRequest, res: Resp
         voiceLanguage || 'bn'
       ]
     );
+
+    // Invalidate Redis credentials cache for this page
+    if (pageId) {
+      await delCache(`page:creds:${pageId}`);
+    }
+    await delCachePattern('page:creds:*');
+    console.log(`🧹 Invalidated Redis page credentials cache.`);
 
     res.status(200).json({
       success: true,

@@ -4,6 +4,7 @@ import { getAIResponse } from '../services/aiService';
 import { sendFacebookMessage, sendFacebookAudioMessage } from '../services/facebookService';
 import { generateVoice, transcribeAudio } from '../services/voiceService';
 import { pool } from '../config/db';
+import { getCache, setCache } from '../config/redis';
 
 dotenv.config();
 
@@ -60,7 +61,7 @@ export async function receiveWebhookEvent(req: Request, res: Response): Promise<
 
           // Execute smart lookup and AI analysis in the background
           try {
-            // Fetch page credentials settings dynamically to get access token and keys
+            // Fetch page credentials settings dynamically from Redis or DB fallback
             let pageAccessToken = undefined;
             let voiceEnabled = false;
             let voiceProvider = 'google';
@@ -69,12 +70,24 @@ export async function receiveWebhookEvent(req: Request, res: Response): Promise<
             let pageUserId = undefined;
 
             if (recipientPageId) {
-              const credsCheck = await pool.query(
-                'SELECT * FROM page_credentials WHERE page_id = $1', 
-                [recipientPageId]
-              );
-              if (credsCheck.rows.length > 0) {
-                const creds = credsCheck.rows[0];
+              const cacheKey = `page:creds:${recipientPageId}`;
+              let creds = await getCache<any>(cacheKey);
+
+              if (!creds) {
+                const credsCheck = await pool.query(
+                  'SELECT * FROM page_credentials WHERE page_id = $1', 
+                  [recipientPageId]
+                );
+                if (credsCheck.rows.length > 0) {
+                  creds = credsCheck.rows[0];
+                  await setCache(cacheKey, creds, 86400); // Cache 24 hrs
+                  console.log(`⚡ Cached page credentials in Redis for Page ID ${recipientPageId}`);
+                }
+              } else {
+                console.log(`⚡ [Redis HIT] Page credentials loaded from Redis for Page ID ${recipientPageId}`);
+              }
+
+              if (creds) {
                 pageAccessToken = creds.page_access_token;
                 voiceEnabled = creds.voice_enabled;
                 voiceProvider = creds.voice_provider;

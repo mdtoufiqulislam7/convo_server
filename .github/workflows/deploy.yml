@@ -41,6 +41,7 @@ jobs:
             docker run -d \
               --name ${{ env.IMAGE_NAME }} \
               --restart unless-stopped \
+              --add-host=host.docker.internal:host-gateway \
               -p 5000:5000 \
               --env-file ${{ env.TARGET_DIR }}/.env \
               ${{ env.IMAGE_NAME }}:latest
