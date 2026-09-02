@@ -15,43 +15,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Copy project files to AWS EC2 via SCP
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          # If using SSH Password instead of Key, uncomment password line and comment key:
-          # password: ${{ secrets.EC2_PASSWORD }}
-          source: "."
-          target: ${{ env.TARGET_DIR }}
-          rm: false
-
       - name: Build & Deploy Docker Container on AWS EC2 via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          # If using SSH Password instead of Key, uncomment password line and comment key:
+          # If using SSH Password instead of Key, uncomment line below and comment 'key':
           # password: ${{ secrets.EC2_PASSWORD }}
           script: |
-            echo "🚀 Starting Local Build & Container Restart on Server..."
+            echo "🚀 Starting Deployment on Server..."
 
             # 1. Navigate to target directory
             cd ${{ env.TARGET_DIR }}
 
-            # 2. Build Docker image directly on server (100% Private, No Docker Hub!)
+            # 2. Pull latest code from GitHub repository
+            git pull origin main || git pull origin master
+
+            # 3. Build Docker image directly on server (100% Private, No Docker Hub!)
             docker build -t ${{ env.IMAGE_NAME }}:latest .
 
-            # 3. Stop and remove existing container if running
+            # 4. Stop and remove existing container if running
             docker stop ${{ env.IMAGE_NAME }} || true
             docker rm ${{ env.IMAGE_NAME }} || true
 
-            # 4. Run new container with production .env file
+            # 5. Run new container with production .env file
             docker run -d \
               --name ${{ env.IMAGE_NAME }} \
               --restart unless-stopped \
@@ -59,9 +47,10 @@ jobs:
               --env-file ${{ env.TARGET_DIR }}/.env \
               ${{ env.IMAGE_NAME }}:latest
 
-            # 5. Clean up old dangling build images
+            # 6. Clean up old dangling images
             docker image prune -f
 
             echo "✅ Deployment completed successfully!"
+
 
 
